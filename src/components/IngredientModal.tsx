@@ -205,7 +205,6 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                     setBarcode(scanned);
                     setIsScanningBarcode(false);
                   }}
-                  onClose={() => setIsScanningBarcode(false)}
                 />
               </div>
             )}

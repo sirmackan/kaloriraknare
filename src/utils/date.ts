@@ -16,7 +16,7 @@ export function addDays(dateString: string, days: number): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatHeaderDate(dateString: string): { label: string; subLabel: string } {
+export function formatHeaderDate(dateString: string): { label: string } {
   const today = getTodayString();
   const yesterday = addDays(today, -1);
   const tomorrow = addDays(today, 1);
@@ -40,7 +40,5 @@ export function formatHeaderDate(dateString: string): { label: string; subLabel:
     label = `Imorgon, ${dayOfMonth} ${month}`;
   }
 
-  const subLabel = dateString === today ? 'Dagens logg' : `${weekday} ${y}`;
-
-  return { label, subLabel };
+  return { label };
 }

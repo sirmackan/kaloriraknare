@@ -63,20 +63,6 @@ export interface Recipe {
   createdAt: string;
 }
 
-export interface DailySummary {
-  date: string;
-  totalCalories: number;
-  totalProtein: number;
-  targetCalories: number;
-  targetProtein: number;
-  meals: {
-    breakfast: { items: MealItem[]; calories: number; protein: number };
-    lunch: { items: MealItem[]; calories: number; protein: number };
-    dinner: { items: MealItem[]; calories: number; protein: number };
-    snack: { items: MealItem[]; calories: number; protein: number };
-  };
-}
-
 export const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 export const MEAL_LABELS: Record<MealType, string> = {

@@ -4,7 +4,6 @@ import { BarcodeScanner as WasmBarcodeScanner, type ScanResult } from 'web-wasm-
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
-  onClose?: () => void;
 }
 
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {

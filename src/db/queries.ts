@@ -118,7 +118,7 @@ export async function createIngredient(data: {
   }
 }
 
-export async function updateIngredient(id: string, userId: string, data: {
+export async function updateIngredient(id: string, data: {
   name: string;
   barcode?: string;
   unit: BaseUnit;

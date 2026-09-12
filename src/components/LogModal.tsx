@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Clock, Plus, Sparkles, ChevronRight, ScanBarcode, Pencil } from 'lucide-react';
+import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil } from 'lucide-react';
 import type { Ingredient, MealType, Recipe } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { api } from '../services/api';
@@ -33,7 +33,6 @@ export const LogModal: React.FC<LogModalProps> = ({
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isScanningCamera, setIsScanningCamera] = useState(false);
-  const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [loggingRecipeId, setLoggingRecipeId] = useState<string | null>(null);
 
   // Debounce search input by 280ms
@@ -52,7 +51,6 @@ export const LogModal: React.FC<LogModalProps> = ({
   // Handle scanned barcode
   const handleBarcodeScanned = async (barcode: string) => {
     setIsScanningCamera(false);
-    setScanMessage(null);
     try {
       const matches = await api.getIngredients(undefined, barcode);
       if (matches.length > 0) {
@@ -156,7 +154,6 @@ export const LogModal: React.FC<LogModalProps> = ({
                 type="button"
                 onClick={() => {
                   setIsScanningCamera((prev) => !prev);
-                  setScanMessage(null);
                 }}
                 title={isScanningCamera ? "Stäng kamera" : "Skanna streckkod med kamera"}
                 className={`p-2.5 rounded-xl border transition active:scale-95 touch-manipulation flex items-center justify-center shrink-0 ${
@@ -172,7 +169,7 @@ export const LogModal: React.FC<LogModalProps> = ({
             {/* In-place Barcode Camera Scanner */}
             {isScanningCamera && (
               <div className="relative animate-in fade-in duration-150">
-                <BarcodeScanner onScan={handleBarcodeScanned} onClose={() => setIsScanningCamera(false)} />
+                <BarcodeScanner onScan={handleBarcodeScanned} />
               </div>
             )}
 

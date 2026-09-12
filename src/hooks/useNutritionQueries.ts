@@ -1,13 +1,12 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../services/api';
-import type { MealType, LoggedUnit, BaseUnit, MealItem, Ingredient, Recipe } from '../types';
+import type { MealType, LoggedUnit, BaseUnit } from '../types';
 
 export const nutritionKeys = {
   allMeals: ['meals'] as const,
   mealsByDate: (date: string) => ['meals', date] as const,
   allIngredients: ['ingredients'] as const,
   ingredientsList: (q?: string, barcode?: string) => ['ingredients', 'list', { q: q || '', barcode: barcode || '' }] as const,
-  ingredientDetail: (id: string) => ['ingredients', 'detail', id] as const,
   recentIngredients: ['ingredients', 'recent'] as const,
   allRecipes: ['recipes'] as const,
 };
@@ -21,14 +20,6 @@ export function useMealsQuery(date: string, enabled = true) {
   });
 }
 
-export function useMealsForDateQuery(date: string, enabled = true) {
-  return useQuery({
-    queryKey: nutritionKeys.mealsByDate(date),
-    queryFn: () => api.getMealsForDate(date),
-    enabled: Boolean(date) && enabled,
-  });
-}
-
 // --- Ingredient Queries ---
 export function useIngredientsQuery(q?: string, barcode?: string) {
   const isEnabled = Boolean(q?.trim() || barcode?.trim());
@@ -38,14 +29,6 @@ export function useIngredientsQuery(q?: string, barcode?: string) {
     enabled: isEnabled,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
-  });
-}
-
-export function useIngredientQuery(id?: string) {
-  return useQuery({
-    queryKey: id ? nutritionKeys.ingredientDetail(id) : ['ingredients', 'detail', 'none'],
-    queryFn: () => (id ? api.getIngredientById(id) : null),
-    enabled: Boolean(id),
   });
 }
 
@@ -132,24 +115,6 @@ export function useDeleteMealMutation() {
   });
 }
 
-export function useCopyYesterdayMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      date,
-      targetMealType,
-      sourceMealType,
-    }: {
-      date: string;
-      targetMealType: MealType;
-      sourceMealType?: MealType;
-    }) => api.copyYesterday(date, targetMealType, sourceMealType),
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables.date) });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
-    },
-  });
-}
 
 export function useCopyMealFromDateMutation() {
   const queryClient = useQueryClient();

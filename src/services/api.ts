@@ -151,7 +151,7 @@ export const api = {
     return res.json();
   },
 
-  async deleteIngredient(id: string): Promise<boolean> {
+  async deleteIngredient(_id: string): Promise<boolean> {
     // Ingredients in global library can be kept or hidden
     return true;
   },
@@ -227,15 +227,6 @@ export const api = {
     return data.success;
   },
 
-  async copyYesterday(date: string, targetMealType: MealType, sourceMealType?: MealType): Promise<MealItem[]> {
-    const [y, m, d] = date.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    dt.setDate(dt.getDate() - 1);
-    const yesterday = dt.toISOString().split('T')[0];
-
-    return this.copyMealFromDate(date, targetMealType, yesterday, sourceMealType || targetMealType);
-  },
-
   async copyMealFromDate(
     targetDate: string,
     targetMealType: MealType,
@@ -255,20 +246,6 @@ export const api = {
     }));
 
     return this.logMealBatch(batch);
-  },
-
-  async getMealsForDate(date: string): Promise<MealItem[]> {
-    return this.getMeals(date);
-  },
-
-  async getYesterdayMeals(date: string): Promise<{ date: string; items: MealItem[] }> {
-    const [y, m, d] = date.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    dt.setDate(dt.getDate() - 1);
-    const yesterday = dt.toISOString().split('T')[0];
-
-    const items = await this.getMeals(yesterday);
-    return { date: yesterday, items };
   },
 
   // Recipes

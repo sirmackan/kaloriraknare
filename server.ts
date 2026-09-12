@@ -110,8 +110,7 @@ app.post('/api/ingredients', async (req, res) => {
 
 app.put('/api/ingredients/:id', async (req, res) => {
   try {
-    const userId = getUserId(req);
-    const item = await updateIngredient(req.params.id, userId, req.body);
+    const item = await updateIngredient(req.params.id, req.body);
     res.json(item);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

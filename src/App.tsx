@@ -13,7 +13,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { CopyYesterdayModal } from './components/CopyYesterdayModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { GoogleSignInScreen } from './components/GoogleSignInScreen';
-import { getTodayString, addDays, formatHeaderDate } from './utils/date';
+import { getTodayString, addDays } from './utils/date';
 import { api } from './services/api';
 import {
   useMealsQuery,
@@ -27,7 +27,7 @@ import {
   useDeleteIngredientMutation,
 } from './hooks/useNutritionQueries';
 import type { MealItem, MealType, Ingredient, Recipe, LoggedUnit } from './types';
-import { MEAL_TYPES, MEAL_LABELS, MEAL_DEFINITE_LABELS } from './types';
+import { MEAL_TYPES, MEAL_DEFINITE_LABELS } from './types';
 import { AlertCircle, X } from 'lucide-react';
 
 const slideVariants = {
@@ -102,8 +102,7 @@ function AppContent() {
   } | null>(null);
 
   const [recipeModalData, setRecipeModalData] = useState<{
-    initialMealToSave?: { mealType: MealType; items: MealItem[] } | null;
-    targetMealType?: MealType;
+    initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
   } | null>(null);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -249,7 +248,6 @@ function AppContent() {
   const handleSaveMealAsRecipe = (mealType: MealType, items: MealItem[]) => {
     setRecipeModalData({
       initialMealToSave: { mealType, items, date: currentDate },
-      targetMealType: mealType,
     });
   };
 
@@ -386,7 +384,7 @@ function AppContent() {
           currentDate={currentDate}
           direction={direction}
           onDateChange={handleDateChange}
-          onOpenRecipes={() => setRecipeModalData({ initialMealToSave: null, targetMealType: 'breakfast' })}
+          onOpenRecipes={() => setRecipeModalData({ initialMealToSave: null })}
           onOpenProfile={() => setIsProfileOpen(true)}
         />
 

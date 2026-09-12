@@ -23,7 +23,19 @@ import {
 const app = express();
 const PORT = 3000;
 
+// Disable ETag header generation to prevent 304 caching of dynamic API responses
+app.set('etag', false);
+
 app.use(express.json());
+
+// Prevent browser/proxy caching for all API endpoints
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
 
 // Helper to extract authenticated userId from Authorization header
 function getUserId(req: express.Request): string | null {

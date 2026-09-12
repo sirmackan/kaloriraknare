@@ -15,44 +15,66 @@ async function getHeaders(): Promise<HeadersInit> {
   };
   if (currentUser) {
     headers['Authorization'] = `Bearer ${currentUser.uid}`;
-    headers['x-user-id'] = currentUser.uid;
   }
   return headers;
+}
+
+const syncPromises = new Map<string, Promise<User>>();
+
+async function syncUserWithBackend(fbUser: { uid: string; email?: string | null; displayName?: string | null }): Promise<User> {
+  const existingPromise = syncPromises.get(fbUser.uid);
+  if (existingPromise) {
+    return existingPromise;
+  }
+  const promise = (async () => {
+    try {
+      const res = await fetch('/api/users/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${fbUser.uid}`,
+        },
+        body: JSON.stringify({
+          id: fbUser.uid,
+          email: fbUser.email || '',
+          name: fbUser.displayName || 'Google-användare',
+          targetCalories: 2400,
+          targetProtein: 160,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Kunde inte synkronisera användarprofil');
+      }
+
+      const userData = await res.json();
+      return {
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        targetCalories: userData.targetCalories,
+        targetProtein: userData.targetProtein,
+        createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
+        goalsConfigured: userData.goalsConfigured ?? true,
+      };
+    } finally {
+      syncPromises.delete(fbUser.uid);
+    }
+  })();
+
+  syncPromises.set(fbUser.uid, promise);
+  return promise;
 }
 
 export const api = {
   // Auth methods - Google Authentication client-side + SQL backend sync
   async signInWithGoogle(): Promise<User> {
     const result = await signInWithPopup(auth, googleProvider);
-    const fbUser = result.user;
-    
-    // Sync with SQL backend
-    const res = await fetch('/api/users/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: fbUser.uid,
-        email: fbUser.email || '',
-        name: fbUser.displayName || 'Google-användare',
-        targetCalories: 2400,
-        targetProtein: 160,
-      }),
-    });
+    return syncUserWithBackend(result.user);
+  },
 
-    if (!res.ok) {
-      throw new Error('Kunde inte synkronisera användarprofil');
-    }
-
-    const userData = await res.json();
-    return {
-      id: userData.id,
-      email: userData.email,
-      name: userData.name,
-      targetCalories: userData.targetCalories,
-      targetProtein: userData.targetProtein,
-      createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
-      goalsConfigured: userData.goalsConfigured ?? true,
-    };
+  async syncUser(fbUser: { uid: string; email?: string | null; displayName?: string | null }): Promise<User> {
+    return syncUserWithBackend(fbUser);
   },
 
   async logout(): Promise<void> {
@@ -88,18 +110,31 @@ export const api = {
 
   // Ingredients (PostgreSQL / Cloud SQL)
   async getIngredients(q?: string, barcode?: string): Promise<Ingredient[]> {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return [];
+
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (barcode) params.set('barcode', barcode);
 
-    const res = await fetch(`/api/ingredients?${params.toString()}`);
-    if (!res.ok) return [];
+    const headers = await getHeaders();
+    const res = await fetch(`/api/ingredients?${params.toString()}`, { headers });
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta råvaror');
+    }
     return res.json();
   },
 
   async getIngredientById(id: string): Promise<Ingredient | null> {
-    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`);
-    if (!res.ok) return null;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return null;
+
+    const headers = await getHeaders();
+    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, { headers });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta råvara');
+    }
     return res.json();
   },
 
@@ -108,7 +143,9 @@ export const api = {
     if (!currentUser) return [];
     const headers = await getHeaders();
     const res = await fetch('/api/ingredients/recent', { headers });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta senaste råvaror');
+    }
     return res.json();
   },
 
@@ -151,9 +188,17 @@ export const api = {
     return res.json();
   },
 
-  async deleteIngredient(_id: string): Promise<boolean> {
-    // Ingredients in global library can be kept or hidden
-    return true;
+  async deleteIngredient(id: string): Promise<boolean> {
+    const headers = await getHeaders();
+    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!res.ok) {
+      throw new Error('Kunde inte ta bort råvara');
+    }
+    const data = await res.json();
+    return data.success;
   },
 
   // Meals
@@ -162,7 +207,9 @@ export const api = {
     if (!currentUser) return [];
     const headers = await getHeaders();
     const res = await fetch(`/api/meals?date=${encodeURIComponent(date)}`, { headers });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta måltider');
+    }
     return res.json();
   },
 
@@ -222,7 +269,9 @@ export const api = {
       method: 'DELETE',
       headers,
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      throw new Error('Kunde inte ta bort måltidsrad');
+    }
     const data = await res.json();
     return data.success;
   },
@@ -254,7 +303,9 @@ export const api = {
     if (!currentUser) return [];
     const headers = await getHeaders();
     const res = await fetch('/api/recipes', { headers });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta recept');
+    }
     return res.json();
   },
 
@@ -279,7 +330,9 @@ export const api = {
       method: 'DELETE',
       headers,
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      throw new Error('Kunde inte ta bort recept');
+    }
     const data = await res.json();
     return data.success;
   },

@@ -23,6 +23,7 @@ export interface Ingredient {
   pieceLabel?: string | null; // e.g. "st", "ägg", "skiva", "skopa"
   createdByUserId: string; // 'system' or user ID
   createdByName?: string;
+  isDeleted?: boolean;
   createdAt: string;
 }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Flame, Dumbbell, Pencil } from 'lucide-react';
+import { X, Check, Flame, Dumbbell } from 'lucide-react';
 import type { Ingredient, LoggedUnit, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
 
@@ -12,7 +12,6 @@ interface AmountModalProps {
   isEditing?: boolean;
   isSubmitting?: boolean;
   onConfirm: (amount: number, unit: LoggedUnit) => Promise<void> | void;
-  onEditIngredient?: (ingredient: Ingredient) => void;
   onClose: () => void;
 }
 
@@ -25,7 +24,6 @@ export const AmountModal: React.FC<AmountModalProps> = ({
   isEditing = false,
   isSubmitting: isSubmittingProp,
   onConfirm,
-  onEditIngredient,
   onClose,
 }) => {
   const categoryLabel = mealType ? MEAL_LABELS[mealType].toLowerCase() : (customCategoryLabel || 'recept');
@@ -98,22 +96,9 @@ export const AmountModal: React.FC<AmountModalProps> = ({
             <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
               {isEditing ? 'Redigera rad' : `Lägg till i ${categoryLabel}`}
             </span>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
-                {ingredient.name}
-              </h3>
-              {onEditIngredient && (
-                <button
-                  type="button"
-                  id="edit-ingredient-from-amount-btn"
-                  onClick={() => onEditIngredient(ingredient)}
-                  title="Redigera eller ta bort råvara"
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
+              {ingredient.name}
+            </h3>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-1">
               <span className="text-amber-600 dark:text-amber-400 font-medium">{ingredient.caloriesPer100} kcal</span>
               <span>•</span>

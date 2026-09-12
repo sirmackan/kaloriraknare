@@ -27,41 +27,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         } else {
           try {
-            // Sync with SQL backend on login / refresh
-            const res = await fetch('/api/users/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: fbUser.uid,
-                email: fbUser.email || '',
-                name: fbUser.displayName || 'Google-användare',
-                targetCalories: 2400,
-                targetProtein: 160,
-              }),
-            });
-
-            if (res.ok) {
-              const userData = await res.json();
-              setUser({
-                id: userData.id,
-                email: userData.email,
-                name: userData.name,
-                targetCalories: userData.targetCalories,
-                targetProtein: userData.targetProtein,
-                createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
-                goalsConfigured: userData.goalsConfigured ?? true,
-              });
-            } else {
-              setUser({
-                id: fbUser.uid,
-                email: fbUser.email || '',
-                name: fbUser.displayName || 'Användare',
-                targetCalories: 2400,
-                targetProtein: 160,
-                createdAt: new Date().toISOString(),
-                goalsConfigured: true,
-              });
-            }
+            const profile = await api.syncUser(fbUser);
+            setUser(profile);
           } catch (err) {
             console.error('Error loading user profile:', err);
             setUser(null);
@@ -78,27 +45,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = async () => {
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
-      const fbUser = auth.currentUser;
-      const res = await fetch('/api/users/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          name: fbUser.displayName || 'Google-användare',
-        }),
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        setUser({
-          id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          targetCalories: userData.targetCalories,
-          targetProtein: userData.targetProtein,
-          createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
-          goalsConfigured: userData.goalsConfigured ?? true,
-        });
+      try {
+        const profile = await api.syncUser(auth.currentUser);
+        setUser(profile);
+      } catch (err) {
+        console.error('Error refreshing user profile:', err);
       }
     }
   };

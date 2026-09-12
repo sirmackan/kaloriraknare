@@ -11,7 +11,6 @@ import { IngredientModal } from './components/IngredientModal';
 import { RecipeModal } from './components/RecipeModal';
 import { ProfileModal } from './components/ProfileModal';
 import { CopyYesterdayModal } from './components/CopyYesterdayModal';
-import { OfflineIndicator } from './components/OfflineIndicator';
 import { GoogleSignInScreen } from './components/GoogleSignInScreen';
 import { getTodayString, addDays } from './utils/date';
 import { api } from './services/api';
@@ -78,15 +77,6 @@ function AppContent() {
   // Modals state
   const [activeLogMeal, setActiveLogMeal] = useState<MealType | null>(null);
   const [amountModalData, setAmountModalData] = useState<{
-    ingredient: Ingredient;
-    mealType: MealType;
-    isEditing?: boolean;
-    existingItemId?: string;
-    initialAmount?: number;
-    initialUnit?: LoggedUnit;
-  } | null>(null);
-
-  const [amountModalBackup, setAmountModalBackup] = useState<{
     ingredient: Ingredient;
     mealType: MealType;
     isEditing?: boolean;
@@ -201,28 +191,14 @@ function AppContent() {
   // Edit logged item
   const handleEditItem = async (item: MealItem) => {
     try {
-      // Find ingredient to get metadata
       const fetchedIng = await api.getIngredientById(item.ingredientId);
-      const effectiveFactor =
-        item.loggedUnit === 'st'
-          ? item.pieceWeight
-            ? (item.amount * item.pieceWeight) / 100
-            : item.amount || 1
-          : item.amount / 100 || 1;
-
-      const ing = fetchedIng || {
-        id: item.ingredientId,
-        name: item.ingredientName,
-        unit: item.baseUnit,
-        caloriesPer100: Math.round(item.calories / (effectiveFactor || 1)),
-        proteinPer100: Math.round(((item.protein / (effectiveFactor || 1))) * 10) / 10,
-        pieceWeight: item.pieceWeight,
-        createdByUserId: 'system',
-        createdAt: new Date().toISOString(),
-      };
+      if (!fetchedIng) {
+        showErrorToast('Råvaran kunde inte hittas');
+        return;
+      }
 
       setAmountModalData({
-        ingredient: ing,
+        ingredient: fetchedIng,
         mealType: item.mealType,
         isEditing: true,
         existingItemId: item.id,
@@ -314,13 +290,7 @@ function AppContent() {
           data: ingredientData,
         });
         setIngredientModalData(null);
-        if (amountModalBackup && amountModalBackup.ingredient.id === updated.id) {
-          setAmountModalData({
-            ...amountModalBackup,
-            ingredient: updated,
-          });
-          setAmountModalBackup(null);
-        } else if (amountModalData && amountModalData.ingredient.id === updated.id) {
+        if (amountModalData && amountModalData.ingredient.id === updated.id) {
           setAmountModalData({
             ...amountModalData,
             ingredient: updated,
@@ -330,7 +300,6 @@ function AppContent() {
         const created = await createIngredientMutation.mutateAsync(ingredientData);
         const targetMeal = ingredientModalData?.targetMealType || activeLogMeal || 'breakfast';
         setIngredientModalData(null);
-        setAmountModalBackup(null);
 
         // Immediately prompt for amount to log
         setAmountModalData({
@@ -350,7 +319,6 @@ function AppContent() {
     try {
       await deleteIngredientMutation.mutateAsync(ingredientId);
       setIngredientModalData(null);
-      setAmountModalBackup(null);
       if (amountModalData?.ingredient.id === ingredientId) {
         setAmountModalData(null);
       }
@@ -442,9 +410,6 @@ function AppContent() {
           </AnimatePresence>
         </div>
 
-        {/* Offline Indicator */}
-        <OfflineIndicator />
-
         {/* Log Modal (Search / Barcode scan / Recipes) */}
         {activeLogMeal && (
           <LogModal
@@ -489,20 +454,10 @@ function AppContent() {
             initialAmount={amountModalData.initialAmount}
             initialUnit={amountModalData.initialUnit}
             onConfirm={handleConfirmAmount}
-            onEditIngredient={(ingredient) => {
-              const mt = amountModalData.mealType;
-              setAmountModalBackup(amountModalData);
-              setAmountModalData(null);
-              setIngredientModalData({
-                editingIngredient: ingredient,
-                targetMealType: mt,
-              });
-            }}
             onClose={() => {
               const mt = amountModalData.mealType;
               const wasEditing = amountModalData.isEditing;
               setAmountModalData(null);
-              setAmountModalBackup(null);
               if (mt && !wasEditing) {
                 setActiveLogMeal(mt);
               }
@@ -523,10 +478,7 @@ function AppContent() {
               const targetMeal = ingredientModalData.targetMealType;
               const wasEditing = Boolean(ingredientModalData.editingIngredient);
               setIngredientModalData(null);
-              if (amountModalBackup) {
-                setAmountModalData(amountModalBackup);
-                setAmountModalBackup(null);
-              } else if (targetMeal && !wasEditing) {
+              if (targetMeal && !wasEditing) {
                 setActiveLogMeal(targetMeal);
               }
             }}

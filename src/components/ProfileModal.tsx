@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
-import { X, Check, Target, User as UserIcon, LogOut, Chrome, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { X, Check, Target, User as UserIcon, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useUpdateGoalsMutation } from '../hooks/useNutritionQueries';
 
 interface ProfileModalProps {
   onClose: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
-  const { user, signInWithGoogle, logout, refreshUser } = useAuth();
+  const { user, logout, updateGoals } = useAuth();
   const { theme, setTheme } = useTheme();
-  const updateGoalsMutation = useUpdateGoalsMutation();
 
   const [calGoal, setCalGoal] = useState(user ? String(user.targetCalories) : '2400');
   const [proGoal, setProGoal] = useState(user ? String(user.targetProtein) : '160');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
-  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSavingGoals, setIsSavingGoals] = useState(false);
 
   const handleSaveGoals = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,34 +32,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
       return;
     }
 
-    if (!updateGoalsMutation.isPending) {
+    if (!isSavingGoals) {
       try {
-        await updateGoalsMutation.mutateAsync({
-          targetCalories: cals,
-          targetProtein: pros,
-        });
-        await refreshUser();
+        setIsSavingGoals(true);
+        await updateGoals(cals, pros);
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 2000);
       } catch (err: any) {
         console.error(err);
         setGoalError(err.message || 'Kunde inte spara dina mål.');
+      } finally {
+        setIsSavingGoals(false);
       }
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setIsGoogleSigningIn(true);
-      setAuthError(null);
-      await signInWithGoogle();
-    } catch (err: any) {
-      console.error(err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setAuthError(err.message || 'Kunde inte logga in med Google');
-      }
-    } finally {
-      setIsGoogleSigningIn(false);
     }
   };
 
@@ -198,10 +179,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
           <button
             id="save-goals-btn"
             type="submit"
-            disabled={updateGoalsMutation.isPending}
+            disabled={isSavingGoals}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-2xl shadow-md transition active:scale-98 flex items-center justify-center gap-2 touch-manipulation disabled:opacity-50"
           >
-            {updateGoalsMutation.isPending ? (
+            {isSavingGoals ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Sparar mål...</span>
@@ -215,7 +196,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
           </button>
         </form>
 
-        {/* User Account & Google Sign In Section */}
+        {/* User Account Section */}
         <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -227,13 +208,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
             </span>
           </div>
 
-          {authError && (
-            <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs">
-              {authError}
-            </div>
-          )}
-
-          {user ? (
+          {user && (
             <div className="p-3.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -256,32 +231,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                   <span>Logga ut</span>
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 text-center transition-colors">
-              <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                Logga in med ditt Google-konto för att synkronisera dina måltider, personliga mål och recept.
-              </div>
-
-              <button
-                id="sign-in-with-google-modal-btn"
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isGoogleSigningIn}
-                className="w-full py-3 px-4 bg-white hover:bg-slate-100 active:scale-98 text-slate-900 text-sm font-semibold rounded-2xl shadow-xs border border-slate-200 dark:border-slate-700 transition flex items-center justify-center gap-2.5 touch-manipulation disabled:opacity-50"
-              >
-                {isGoogleSigningIn ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                    <span>Loggar in med Google...</span>
-                  </>
-                ) : (
-                  <>
-                    <Chrome className="w-4.5 h-4.5 text-emerald-600" />
-                    <span>Logga in med Google</span>
-                  </>
-                )}
-              </button>
             </div>
           )}
         </div>

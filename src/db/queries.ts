@@ -44,11 +44,19 @@ export async function updateUserGoals(userId: string, targetCalories: number, ta
 export async function getIngredients(queryStr?: string, barcode?: string) {
   try {
     if (barcode && barcode.trim()) {
-      return await db.select().from(ingredients).where(eq(ingredients.barcode, barcode.trim())).limit(10);
+      return await db
+        .select()
+        .from(ingredients)
+        .where(and(eq(ingredients.isDeleted, false), eq(ingredients.barcode, barcode.trim())))
+        .limit(10);
     }
     if (queryStr && queryStr.trim()) {
       const term = `%${queryStr.trim()}%`;
-      return await db.select().from(ingredients).where(ilike(ingredients.name, term)).limit(30);
+      return await db
+        .select()
+        .from(ingredients)
+        .where(and(eq(ingredients.isDeleted, false), ilike(ingredients.name, term)))
+        .limit(30);
     }
     return [];
   } catch (error) {
@@ -79,10 +87,27 @@ export async function getRecentIngredients(userId: string) {
     const uniqueIds = Array.from(new Set(recentMeals.map((m) => m.ingredientId))).slice(0, 20);
     if (uniqueIds.length === 0) return [];
 
-    return await db.select().from(ingredients).where(inArray(ingredients.id, uniqueIds));
+    return await db
+      .select()
+      .from(ingredients)
+      .where(and(inArray(ingredients.id, uniqueIds), eq(ingredients.isDeleted, false)));
   } catch (error) {
     console.error('Failed to fetch recent ingredients:', error);
-    return [];
+    throw new Error('Failed to fetch recent ingredients', { cause: error });
+  }
+}
+
+export async function deleteIngredient(id: string) {
+  try {
+    const [updated] = await db
+      .update(ingredients)
+      .set({ isDeleted: true })
+      .where(eq(ingredients.id, id))
+      .returning();
+    return Boolean(updated);
+  } catch (error) {
+    console.error('Failed to delete ingredient:', error);
+    throw new Error('Failed to delete ingredient', { cause: error });
   }
 }
 
@@ -227,21 +252,22 @@ export async function updateMealItem(userId: string, mealId: string, amount: num
     }
 
     const ing = await getIngredientById(existing.ingredientId);
-    const caloriesPer100 = ing ? ing.caloriesPer100 : (existing.amount > 0 ? (existing.calories / (existing.amount / 100)) : 0);
-    const proteinPer100 = ing ? ing.proteinPer100 : (existing.amount > 0 ? (existing.protein / (existing.amount / 100)) : 0);
-    const pieceWeight = ing?.pieceWeight || existing.pieceWeight || null;
+    if (!ing) {
+      throw new Error('Ingredient not found');
+    }
 
     const effectiveGrams =
-      loggedUnit === 'st' && pieceWeight
-        ? amount * pieceWeight
+      loggedUnit === 'st' && ing.pieceWeight
+        ? amount * ing.pieceWeight
         : amount;
 
-    const calories = Math.round((effectiveGrams / 100) * caloriesPer100);
-    const protein = Math.round(((effectiveGrams / 100) * proteinPer100) * 10) / 10;
+    const calories = Math.round((effectiveGrams / 100) * ing.caloriesPer100);
+    const protein = Math.round(((effectiveGrams / 100) * ing.proteinPer100) * 10) / 10;
 
     const [updated] = await db.update(meals).set({
       amount,
       loggedUnit,
+      pieceWeight: ing.pieceWeight || null,
       calories,
       protein,
     }).where(and(eq(meals.id, mealId), eq(meals.userId, userId))).returning();

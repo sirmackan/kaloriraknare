@@ -22,6 +22,7 @@ export const ingredients = pgTable('ingredients', {
   pieceLabel: text('piece_label'),
   createdByUserId: text('created_by_user_id').notNull().default('system'),
   createdByName: text('created_by_name'),
+  isDeleted: boolean('is_deleted').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -1,0 +1,10 @@
+{
+  "name": "Kaloriräknare",
+  "description": "Mobilfokuserad PWA för snabb loggning av kalorier och protein med Google-inloggning, streckkodsläsare och sparade recept.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

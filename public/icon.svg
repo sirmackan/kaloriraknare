@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="180" stroke="#10b981" stroke-width="24" stroke-dasharray="16 8"/>
+  <path d="M256 120C256 120 200 180 200 240C200 280 225 310 256 310C287 310 312 280 312 240C312 180 256 120 256 120Z" fill="#10b981"/>
+  <path d="M256 220C256 220 230 250 230 280C230 295 242 305 256 305C270 305 282 295 282 280C282 250 256 220 256 220Z" fill="#f59e0b"/>
+  <text x="256" y="390" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="bold" letter-spacing="2">KCAL</text>
+</svg>

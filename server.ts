@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import { initDb } from './src/db/index.ts';
 import {
   syncUser,
   updateUserGoals,
@@ -259,6 +260,8 @@ app.delete('/api/recipes/:id', async (req, res) => {
 });
 
 async function startServer() {
+  await initDb();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

@@ -118,10 +118,7 @@ export const api = {
     if (barcode) params.set('barcode', barcode);
 
     const headers = await getHeaders();
-    const res = await fetch(`/api/ingredients?${params.toString()}`, {
-      headers,
-      cache: 'no-store',
-    });
+    const res = await fetch(`/api/ingredients?${params.toString()}`, { headers });
     if (!res.ok) {
       throw new Error('Kunde inte hämta råvaror');
     }

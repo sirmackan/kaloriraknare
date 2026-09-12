@@ -27,8 +27,8 @@ export function useIngredientsQuery(q?: string, barcode?: string) {
     queryKey: nutritionKeys.ingredientsList(q, barcode),
     queryFn: () => api.getIngredients(q, barcode),
     enabled: isEnabled,
-    placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    staleTime: 0, // Always fetch live results when searching
+    refetchOnMount: 'always',
   });
 }
 

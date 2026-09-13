@@ -135,8 +135,8 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto my-auto transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto">
+      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto my-auto transition-colors">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -276,9 +276,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                 <input
                   id="ingredient-cal-input"
                   name="item_calories"
-                  type="number"
-                  step="any"
-                  min="0"
+                  type="text"
                   inputMode="decimal"
                   autoComplete="off"
                   autoCorrect="off"
@@ -289,7 +287,12 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                   required
                   placeholder="kcal"
                   value={caloriesPer100}
-                  onChange={(e) => setCaloriesPer100(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(',', '.');
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setCaloriesPer100(val);
+                    }
+                  }}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -301,9 +304,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                 <input
                   id="ingredient-pro-input"
                   name="item_protein"
-                  type="number"
-                  step="any"
-                  min="0"
+                  type="text"
                   inputMode="decimal"
                   autoComplete="off"
                   autoCorrect="off"
@@ -314,7 +315,12 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                   required
                   placeholder="gram"
                   value={proteinPer100}
-                  onChange={(e) => setProteinPer100(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(',', '.');
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setProteinPer100(val);
+                    }
+                  }}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-sky-400"
                 />
               </div>
@@ -345,9 +351,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                   <input
                     id="ingredient-piece-weight-input"
                     name="item_piece_weight"
-                    type="number"
-                    step="any"
-                    min="0.1"
+                    type="text"
                     inputMode="decimal"
                     autoComplete="off"
                     autoCorrect="off"
@@ -357,7 +361,12 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                     data-1p-ignore="true"
                     placeholder="T.ex. 55"
                     value={pieceWeight}
-                    onChange={(e) => setPieceWeight(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(',', '.');
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setPieceWeight(val);
+                      }
+                    }}
                     className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>

@@ -15,10 +15,33 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isTorchOn, setIsTorchOn] = useState(false);
 
+  const onScanRef = useRef(onScan);
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
   useEffect(() => {
     let isMounted = true;
     hasScannedRef.current = false;
     let scannerInstance: WasmBarcodeScanner | null = null;
+
+    const stopContainerMediaTracks = () => {
+      if (containerRef.current) {
+        const videos = containerRef.current.querySelectorAll('video');
+        videos.forEach((video) => {
+          if (video.srcObject && 'getTracks' in (video.srcObject as MediaStream)) {
+            (video.srcObject as MediaStream).getTracks().forEach((track) => {
+              try {
+                track.stop();
+              } catch {
+                // Ignore track stop error
+              }
+            });
+            video.srcObject = null;
+          }
+        });
+      }
+    };
 
     const startScanner = async () => {
       // Allow DOM to calculate container dimensions
@@ -53,7 +76,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
               // Defer callback out of synchronous WASM call stack
               setTimeout(() => {
                 if (isMounted) {
-                  onScan(cleaned);
+                  onScanRef.current(cleaned);
                 }
               }, 20);
             }
@@ -73,18 +96,36 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
         scannerRef.current = scannerInstance;
         await scannerInstance.start();
 
-        if (isMounted) {
-          setCameraActive(true);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setCameraActive(false);
-          const msg = err?.message || String(err);
-          if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
-            setErrorMsg('Kameratillstånd nekades.');
-          } else {
-            setErrorMsg('Kunde inte starta kameran.');
+        // Handle in-flight startup promises: if unmounted while start() was awaiting, stop immediately
+        if (!isMounted) {
+          try {
+            scannerInstance.stop();
+          } catch (e) {
+            console.warn('Error stopping scanner after unmount:', e);
           }
+          stopContainerMediaTracks();
+          scannerRef.current = null;
+          return;
+        }
+
+        setCameraActive(true);
+      } catch (err: any) {
+        if (!isMounted) {
+          try {
+            scannerInstance?.stop();
+          } catch {
+            // Ignore
+          }
+          stopContainerMediaTracks();
+          scannerRef.current = null;
+          return;
+        }
+        setCameraActive(false);
+        const msg = err?.message || String(err);
+        if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+          setErrorMsg('Kameratillstånd nekades.');
+        } else {
+          setErrorMsg('Kunde inte starta kameran.');
         }
       }
     };
@@ -95,16 +136,17 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
       isMounted = false;
       if (scannerRef.current) {
         try {
-          if (scannerRef.current.isRunning) {
-            scannerRef.current.stop();
-          }
+          // Remove the isRunning conditional check that prevented cleanup:
+          // stop() is called unconditionally
+          scannerRef.current.stop();
         } catch (e) {
-          console.warn('Error stopping scanner:', e);
+          console.warn('Error stopping scanner on unmount:', e);
         }
         scannerRef.current = null;
       }
+      stopContainerMediaTracks();
     };
-  }, [onScan]);
+  }, []);
 
   const toggleTorch = async () => {
     if (!scannerRef.current || !scannerRef.current.isRunning) return;

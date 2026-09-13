@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, BookOpen, Utensils, Search, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Recipe, Ingredient, LoggedUnit, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { FoodItemRow } from './FoodItemRow';
 import { AmountModal } from './AmountModal';
+import { api } from '../services/api';
+import { calculateNutrition, calculateBatchTotals } from '../utils/nutrition';
 import {
   useRecipesQuery,
   useIngredientsQuery,
   useCreateRecipeMutation,
   useDeleteRecipeMutation,
+  nutritionKeys,
 } from '../hooks/useNutritionQueries';
 
 interface RecipeModalProps {
@@ -21,6 +25,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   initialMealToSave,
   onClose,
 }) => {
+  const queryClient = useQueryClient();
   const { data: recipes = [], isLoading: loading } = useRecipesQuery();
   const createRecipeMutation = useCreateRecipeMutation();
   const deleteRecipeMutation = useDeleteRecipeMutation();
@@ -32,7 +37,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [recipeItems, setRecipeItems] = useState<{
     ingredient: Ingredient;
     amount: number;
-    unit: LoggedUnit;
+    unit: LoggedUnit | string;
   }[]>([]);
 
   const hasInitializedFromMeal = useRef(false);
@@ -63,33 +68,82 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const mealDateStr = initialMealToSave.date || new Date().toISOString().split('T')[0];
       setRecipeName(`${MEAL_LABELS[initialMealToSave.mealType]} ${mealDateStr}`);
 
-      const mapped = initialMealToSave.items.map((item) => {
-        const effectiveFactor =
-          item.loggedUnit === 'st'
-            ? item.pieceWeight
-              ? (item.amount * item.pieceWeight) / 100
-              : item.amount || 1
-            : item.amount / 100 || 1;
+      let isMounted = true;
 
-        const ing: Ingredient = {
-          id: item.ingredientId,
-          name: item.ingredientName,
-          unit: item.baseUnit,
-          caloriesPer100: Math.round(item.calories / (effectiveFactor || 1)),
-          proteinPer100: Math.round(((item.protein / (effectiveFactor || 1))) * 10) / 10,
-          pieceWeight: item.pieceWeight,
-          createdByUserId: 'system',
-          createdAt: new Date().toISOString(),
-        };
-        return {
-          ingredient: ing,
-          amount: item.amount,
-          unit: item.loggedUnit,
-        };
-      });
-      setRecipeItems(mapped);
+      const resolveIngredients = async () => {
+        // 1. Check TanStack Query cache for authoritative ingredient records
+        const cachedMap = new Map<string, Ingredient>();
+
+        const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients);
+        if (recent) {
+          for (const ing of recent) {
+            if (ing?.id) cachedMap.set(ing.id, ing);
+          }
+        }
+
+        const allQueries = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
+        for (const [, queryData] of allQueries) {
+          if (Array.isArray(queryData)) {
+            for (const ing of queryData) {
+              if (ing?.id) cachedMap.set(ing.id, ing);
+            }
+          }
+        }
+
+        const buildMappedItems = () =>
+          initialMealToSave.items.map((item: any) => {
+            const authenticIng = cachedMap.get(item.ingredientId) || {
+              id: item.ingredientId,
+              name: item.ingredientName,
+              unit: item.baseUnit,
+              caloriesPer100: 0,
+              proteinPer100: 0,
+              pieceWeight: item.pieceWeight,
+              pieceLabel: item.pieceLabel,
+              createdByUserId: 'system',
+              createdAt: new Date().toISOString(),
+            };
+
+            return {
+              ingredient: authenticIng,
+              amount: item.amount,
+              unit: item.loggedUnit,
+            };
+          });
+
+        // Set initial items from cache if available
+        setRecipeItems(buildMappedItems());
+
+        // 2. Fetch any missing ingredients directly by ID from API (Zero Back-Calculation)
+        const uniqueIds: string[] = Array.from(new Set<string>(initialMealToSave.items.map((i: any) => String(i.ingredientId))));
+        const missingIds: string[] = uniqueIds.filter((id: string) => !cachedMap.has(id));
+
+        if (missingIds.length > 0) {
+          try {
+            const fetched = await Promise.all(
+              missingIds.map((id: string) => api.getIngredientById(id).catch(() => null))
+            );
+            for (const ing of fetched) {
+              if (ing?.id) {
+                cachedMap.set(ing.id, ing);
+              }
+            }
+            if (isMounted) {
+              setRecipeItems(buildMappedItems());
+            }
+          } catch (err) {
+            console.error('Failed to fetch ingredients for recipe conversion:', err);
+          }
+        }
+      };
+
+      resolveIngredients();
+
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [initialMealToSave]);
+  }, [initialMealToSave, queryClient]);
 
   const selectIngredientToAdd = (ing: Ingredient) => {
     setAddingIngredient(ing);
@@ -97,13 +151,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     setDebouncedSearchQuery('');
   };
 
-  const handleConfirmAddIngredient = (amount: number, unit: LoggedUnit) => {
+  const handleConfirmAddIngredient = (amount: number, unit: LoggedUnit | string) => {
     if (!addingIngredient) return;
     setRecipeItems([...recipeItems, { ingredient: addingIngredient, amount, unit }]);
     setAddingIngredient(null);
   };
 
-  const handleConfirmEditIngredient = (amount: number, unit: LoggedUnit) => {
+  const handleConfirmEditIngredient = (amount: number, unit: LoggedUnit | string) => {
     if (editingRecipeItemIndex === null) return;
     const updated = [...recipeItems];
     updated[editingRecipeItemIndex] = {
@@ -119,18 +173,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     setRecipeItems(recipeItems.filter((_, i) => i !== index));
   };
 
-  const calculateTotals = () => {
-    let cals = 0;
-    let pros = 0;
-    for (const item of recipeItems) {
-      const effectiveGrams = item.unit === 'st' && item.ingredient.pieceWeight
-        ? item.amount * item.ingredient.pieceWeight
-        : item.amount;
-      cals += Math.round((effectiveGrams / 100) * item.ingredient.caloriesPer100);
-      pros += (effectiveGrams / 100) * item.ingredient.proteinPer100;
-    }
-    return { cals, pros: Math.round(pros * 10) / 10 };
-  };
+  const totals = calculateBatchTotals(
+    recipeItems.map((item) => ({
+      amount: item.amount,
+      loggedUnit: item.unit,
+      source: item.ingredient,
+    }))
+  );
 
   const handleSaveRecipe = async () => {
     if (!recipeName.trim() || recipeItems.length === 0 || createRecipeMutation.isPending) return;
@@ -139,7 +188,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const payload = recipeItems.map((i) => ({
         ingredientId: i.ingredient.id,
         amount: Math.max(0.01, i.amount),
-        loggedUnit: i.unit,
+        loggedUnit: i.unit as LoggedUnit,
       }));
       await createRecipeMutation.mutateAsync({
         name: recipeName.trim(),
@@ -163,8 +212,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       setRecipeError(err?.message || 'Kunde inte ta bort recept');
     }
   };
-
-  const totals = calculateTotals();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
@@ -383,11 +430,11 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 ) : (
                   <div className="bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs dark:shadow-md transition-colors">
                     {recipeItems.map((item, idx) => {
-                      const effectiveGrams = item.unit === 'st' && item.ingredient.pieceWeight
-                        ? item.amount * item.ingredient.pieceWeight
-                        : item.amount;
-                      const calories = Math.round((effectiveGrams / 100) * item.ingredient.caloriesPer100);
-                      const protein = Math.round(((effectiveGrams / 100) * item.ingredient.proteinPer100) * 10) / 10;
+                      const { calories, protein } = calculateNutrition(
+                        item.amount,
+                        item.unit,
+                        item.ingredient
+                      );
 
                       return (
                         <FoodItemRow
@@ -399,6 +446,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                           loggedUnit={item.unit}
                           baseUnit={item.ingredient.unit}
                           pieceWeight={item.ingredient.pieceWeight}
+                          pieceLabel={item.ingredient.pieceLabel}
                           calories={calories}
                           protein={protein}
                           onEdit={() => setEditingRecipeItemIndex(idx)}
@@ -415,12 +463,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-around text-center text-xs">
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Totala kalorier</span>
-                    <div className="text-base font-bold text-amber-600 dark:text-amber-400">{totals.cals} kcal</div>
+                    <div className="text-base font-bold text-amber-600 dark:text-amber-400">{totals.totalCalories} kcal</div>
                   </div>
                   <div className="w-px bg-slate-200 dark:bg-slate-700" />
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Totalt protein</span>
-                    <div className="text-base font-bold text-sky-600 dark:text-sky-400">{totals.pros} g</div>
+                    <div className="text-base font-bold text-sky-600 dark:text-sky-400">{totals.totalProtein} g</div>
                   </div>
                 </div>
               )}
@@ -473,7 +521,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         <AmountModal
           ingredient={recipeItems[editingRecipeItemIndex].ingredient}
           initialAmount={recipeItems[editingRecipeItemIndex].amount}
-          initialUnit={recipeItems[editingRecipeItemIndex].unit}
+          initialUnit={recipeItems[editingRecipeItemIndex].unit as LoggedUnit}
           isEditing={true}
           customCategoryLabel="recept"
           onConfirm={handleConfirmEditIngredient}

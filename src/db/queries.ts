@@ -1,7 +1,8 @@
 import { db } from './index.ts';
 import { users, ingredients, meals, recipes } from './schema.ts';
-import { eq, and, ilike, desc, inArray } from 'drizzle-orm';
-import type { MealType, LoggedUnit, BaseUnit } from '../types';
+import { eq, and, ilike, desc, inArray, asc } from 'drizzle-orm';
+import type { MealType, LoggedUnit, BaseUnit, RecipeItem } from '../types';
+import { calculateNutrition } from '../utils/nutrition.ts';
 
 // User Queries
 export async function syncUser(user: { id: string; email?: string; name?: string; targetCalories?: number; targetProtein?: number }) {
@@ -56,6 +57,7 @@ export async function getIngredients(queryStr?: string, barcode?: string) {
         .select()
         .from(ingredients)
         .where(and(eq(ingredients.isDeleted, false), ilike(ingredients.name, term)))
+        .orderBy(asc(ingredients.name))
         .limit(30);
     }
     return [];
@@ -193,13 +195,7 @@ export async function addMealItem(userId: string, item: {
       throw new Error('Ingredient not found');
     }
 
-    const effectiveGrams =
-      item.loggedUnit === 'st' && ing.pieceWeight
-        ? item.amount * ing.pieceWeight
-        : item.amount;
-
-    const calories = Math.round((effectiveGrams / 100) * ing.caloriesPer100);
-    const protein = Math.round(((effectiveGrams / 100) * ing.proteinPer100) * 10) / 10;
+    const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
 
     const [created] = await db.insert(meals).values({
       id: item.id,
@@ -231,13 +227,54 @@ export async function addBatchMeals(userId: string, items: {
   amount: number;
   loggedUnit: LoggedUnit;
 }[]) {
+  if (!items || items.length === 0) {
+    return [];
+  }
+
   try {
-    const results = [];
-    for (const item of items) {
-      const created = await addMealItem(userId, item);
-      results.push(created);
-    }
-    return results;
+    return await db.transaction(async (tx) => {
+      // 1. Batch fetch all unique ingredients referenced in the batch
+      const uniqueIds = Array.from(new Set(items.map((i) => i.ingredientId)));
+      const ingRecords = await tx
+        .select()
+        .from(ingredients)
+        .where(inArray(ingredients.id, uniqueIds));
+
+      const ingMap = new Map(ingRecords.map((ing) => [ing.id, ing]));
+
+      // 2. Validate all ingredients exist
+      for (const item of items) {
+        const ing = ingMap.get(item.ingredientId);
+        if (!ing) {
+          throw new Error(`Ingredient with ID ${item.ingredientId} not found`);
+        }
+      }
+
+      // 3. Prepare rows with centralized calculateNutrition helper
+      const valuesToInsert = items.map((item) => {
+        const ing = ingMap.get(item.ingredientId)!;
+        const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
+
+        return {
+          id: item.id,
+          userId,
+          date: item.date,
+          mealType: item.mealType,
+          ingredientId: ing.id,
+          ingredientName: ing.name,
+          amount: item.amount,
+          loggedUnit: item.loggedUnit,
+          baseUnit: ing.unit,
+          pieceWeight: ing.pieceWeight || null,
+          calories,
+          protein,
+        };
+      });
+
+      // 4. Single multi-row batch INSERT
+      const created = await tx.insert(meals).values(valuesToInsert).returning();
+      return created;
+    });
   } catch (error) {
     console.error('Failed to batch add meals:', error);
     throw new Error('Failed to batch add meals', { cause: error });
@@ -256,13 +293,7 @@ export async function updateMealItem(userId: string, mealId: string, amount: num
       throw new Error('Ingredient not found');
     }
 
-    const effectiveGrams =
-      loggedUnit === 'st' && ing.pieceWeight
-        ? amount * ing.pieceWeight
-        : amount;
-
-    const calories = Math.round((effectiveGrams / 100) * ing.caloriesPer100);
-    const protein = Math.round(((effectiveGrams / 100) * ing.proteinPer100) * 10) / 10;
+    const { calories, protein } = calculateNutrition(amount, loggedUnit, ing);
 
     const [updated] = await db.update(meals).set({
       amount,
@@ -297,7 +328,7 @@ export async function getRecipes(userId: string) {
       id: r.id,
       userId: r.userId,
       name: r.name,
-      items: JSON.parse(r.itemsJson || '[]'),
+      items: (r.items || []) as RecipeItem[],
       totalCalories: r.totalCalories,
       totalProtein: r.totalProtein,
       createdAt: r.createdAt.toISOString(),
@@ -310,7 +341,7 @@ export async function getRecipes(userId: string) {
 
 export async function createRecipe(userId: string, id: string, name: string, items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[]) {
   try {
-    const recipeItems = [];
+    const recipeItems: RecipeItem[] = [];
     let totalCalories = 0;
     let totalProtein = 0;
 
@@ -318,13 +349,7 @@ export async function createRecipe(userId: string, id: string, name: string, ite
       const ing = await getIngredientById(item.ingredientId);
       if (!ing) continue;
 
-      const effectiveGrams =
-        item.loggedUnit === 'st' && ing.pieceWeight
-          ? item.amount * ing.pieceWeight
-          : item.amount;
-
-      const calories = Math.round((effectiveGrams / 100) * ing.caloriesPer100);
-      const protein = Math.round(((effectiveGrams / 100) * ing.proteinPer100) * 10) / 10;
+      const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
 
       totalCalories += calories;
       totalProtein += protein;
@@ -334,7 +359,7 @@ export async function createRecipe(userId: string, id: string, name: string, ite
         ingredientName: ing.name,
         amount: item.amount,
         loggedUnit: item.loggedUnit,
-        baseUnit: ing.unit,
+        baseUnit: ing.unit as BaseUnit,
         pieceWeight: ing.pieceWeight || null,
         calories,
         protein,
@@ -345,7 +370,7 @@ export async function createRecipe(userId: string, id: string, name: string, ite
       id,
       userId,
       name: name.trim(),
-      itemsJson: JSON.stringify(recipeItems),
+      items: recipeItems,
       totalCalories,
       totalProtein: Math.round(totalProtein * 10) / 10,
     }).returning();
@@ -354,7 +379,7 @@ export async function createRecipe(userId: string, id: string, name: string, ite
       id: created.id,
       userId: created.userId,
       name: created.name,
-      items: recipeItems,
+      items: (created.items || recipeItems) as RecipeItem[],
       totalCalories: created.totalCalories,
       totalProtein: created.totalProtein,
       createdAt: created.createdAt.toISOString(),

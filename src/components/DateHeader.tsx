@@ -23,7 +23,7 @@ export const DateHeader: React.FC<DateHeaderProps> = ({
   const isToday = currentDate === getTodayString();
 
   return (
-    <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 py-3 transition-colors">
+    <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 transition-colors">
       {/* Top action row */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">

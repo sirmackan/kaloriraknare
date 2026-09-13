@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, Flame, Dumbbell } from 'lucide-react';
 import type { Ingredient, LoggedUnit, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
+import { calculateNutrition, getDisplayPieceLabel } from '../utils/nutrition';
 
 interface AmountModalProps {
   ingredient: Ingredient;
@@ -41,12 +42,11 @@ export const AmountModal: React.FC<AmountModalProps> = ({
 
   const sanitizedAmount = typeof amount === 'string' ? amount.replace(',', '.') : String(amount);
   const numericAmount = parseFloat(sanitizedAmount) || 0;
-  const effectiveGrams = unit === 'st' && ingredient.pieceWeight
-    ? numericAmount * ingredient.pieceWeight
-    : numericAmount;
-
-  const calcCalories = Math.round((effectiveGrams / 100) * ingredient.caloriesPer100);
-  const calcProtein = Math.round(((effectiveGrams / 100) * ingredient.proteinPer100) * 10) / 10;
+  const { calories: calcCalories, protein: calcProtein } = calculateNutrition(
+    numericAmount,
+    unit,
+    ingredient
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,8 +88,8 @@ export const AmountModal: React.FC<AmountModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-200 transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto">
+      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] flex flex-col my-auto animate-in fade-in duration-200 transition-colors">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -135,7 +135,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Antal stycken (st)
+                Antal {getDisplayPieceLabel(ingredient.pieceLabel)}
               </button>
               <button
                 type="button"
@@ -159,9 +159,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
               <input
                 id="amount-input"
                 name="entry_amount"
-                type="number"
-                step="any"
-                min="0"
+                type="text"
                 inputMode="decimal"
                 autoComplete="off"
                 autoCorrect="off"
@@ -170,7 +168,12 @@ export const AmountModal: React.FC<AmountModalProps> = ({
                 data-lpignore="true"
                 data-1p-ignore="true"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(',', '.');
+                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                    setAmount(val);
+                  }
+                }}
                 className="w-28 text-right bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono"
               />
               <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">

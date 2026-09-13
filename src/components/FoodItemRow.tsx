@@ -1,14 +1,16 @@
 import React from 'react';
 import { Edit3, Trash2 } from 'lucide-react';
 import type { LoggedUnit, BaseUnit } from '../types';
+import { isPieceUnit } from '../utils/nutrition';
 
 export interface FoodItemRowProps {
   id: string;
   name: string;
   amount: number;
-  loggedUnit: LoggedUnit;
+  loggedUnit: LoggedUnit | string;
   baseUnit: BaseUnit;
-  pieceWeight?: number;
+  pieceWeight?: number | null;
+  pieceLabel?: string | null;
   calories: number;
   protein: number;
   onEdit: () => void;
@@ -23,13 +25,15 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
   loggedUnit,
   baseUnit,
   pieceWeight,
+  pieceLabel,
   calories,
   protein,
   onEdit,
   onDelete,
   idPrefix = 'item',
 }) => {
-  const hasPieceWeight = loggedUnit === 'st' && pieceWeight;
+  const isPiece = isPieceUnit(loggedUnit, baseUnit, pieceLabel);
+  const hasPieceWeight = isPiece && Boolean(pieceWeight && pieceWeight > 0);
   const gramEquivalent = hasPieceWeight ? Math.round(amount * pieceWeight!) : null;
 
   return (

@@ -56,6 +56,33 @@ const slideVariants = {
   }),
 };
 
+export type ActiveModal =
+  | { type: 'log'; mealType: MealType }
+  | {
+      type: 'amount';
+      ingredient: Ingredient;
+      mealType: MealType;
+      isEditing?: boolean;
+      existingItemId?: string;
+      initialAmount?: number;
+      initialUnit?: LoggedUnit;
+      returnToLogMeal?: MealType;
+    }
+  | {
+      type: 'ingredient';
+      initialBarcode?: string;
+      editingIngredient?: Ingredient;
+      targetMealType?: MealType;
+      returnToLogMeal?: MealType;
+    }
+  | {
+      type: 'recipe';
+      initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
+    }
+  | { type: 'profile' }
+  | { type: 'copyYesterday'; targetMealType: MealType }
+  | null;
+
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState<string>(getTodayString());
@@ -75,29 +102,8 @@ function AppContent() {
   const deleteIngredientMutation = useDeleteIngredientMutation();
 
   // Modals state
-  const [activeLogMeal, setActiveLogMeal] = useState<MealType | null>(null);
-  const [amountModalData, setAmountModalData] = useState<{
-    ingredient: Ingredient;
-    mealType: MealType;
-    isEditing?: boolean;
-    existingItemId?: string;
-    initialAmount?: number;
-    initialUnit?: LoggedUnit;
-  } | null>(null);
-
-  const [ingredientModalData, setIngredientModalData] = useState<{
-    initialBarcode?: string;
-    editingIngredient?: Ingredient;
-    targetMealType?: MealType;
-  } | null>(null);
-
-  const [recipeModalData, setRecipeModalData] = useState<{
-    initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
-  } | null>(null);
-
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [copyingMeal, setCopyingMeal] = useState<MealType | null>(null);
-  const [copyYesterdayTarget, setCopyYesterdayTarget] = useState<MealType | null>(null);
 
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -118,7 +124,7 @@ function AppContent() {
     if (user && user.goalsConfigured === false) {
       const storageKey = `seen_goals_onboarding_${user.id}`;
       if (!sessionStorage.getItem(storageKey)) {
-        setIsProfileOpen(true);
+        setActiveModal({ type: 'profile' });
         sessionStorage.setItem(storageKey, 'true');
       }
     }
@@ -160,7 +166,7 @@ function AppContent() {
 
   // Open modal to choose which meal from yesterday to copy
   const handleCopyYesterday = (mealType: MealType) => {
-    setCopyYesterdayTarget(mealType);
+    setActiveModal({ type: 'copyYesterday', targetMealType: mealType });
   };
 
   // Execute copying selected meal from a source date into target meal
@@ -197,7 +203,8 @@ function AppContent() {
         return;
       }
 
-      setAmountModalData({
+      setActiveModal({
+        type: 'amount',
         ingredient: fetchedIng,
         mealType: item.mealType,
         isEditing: true,
@@ -222,7 +229,8 @@ function AppContent() {
 
   // Save entire meal as recipe
   const handleSaveMealAsRecipe = (mealType: MealType, items: MealItem[]) => {
-    setRecipeModalData({
+    setActiveModal({
+      type: 'recipe',
       initialMealToSave: { mealType, items, date: currentDate },
     });
   };
@@ -239,8 +247,7 @@ function AppContent() {
       }));
 
       await logMealBatchMutation.mutateAsync(batchItems);
-      setRecipeModalData(null);
-      setActiveLogMeal(null);
+      setActiveModal(null);
     } catch (err: any) {
       showErrorToast(err.message || 'Kunde inte logga recept');
     }
@@ -248,11 +255,11 @@ function AppContent() {
 
   // Save amount and log or update item
   const handleConfirmAmount = async (amount: number, unit: LoggedUnit) => {
-    if (!amountModalData) return;
+    if (activeModal?.type !== 'amount') return;
     try {
-      if (amountModalData.isEditing && amountModalData.existingItemId) {
+      if (activeModal.isEditing && activeModal.existingItemId) {
         await updateMealMutation.mutateAsync({
-          id: amountModalData.existingItemId,
+          id: activeModal.existingItemId,
           amount,
           loggedUnit: unit,
           date: currentDate,
@@ -260,14 +267,13 @@ function AppContent() {
       } else {
         await logMealMutation.mutateAsync({
           date: currentDate,
-          mealType: amountModalData.mealType,
-          ingredientId: amountModalData.ingredient.id,
+          mealType: activeModal.mealType,
+          ingredientId: activeModal.ingredient.id,
           amount,
           loggedUnit: unit,
         });
       }
-      setAmountModalData(null);
-      setActiveLogMeal(null);
+      setActiveModal(null);
     } catch (err: any) {
       showErrorToast(err.message || 'Kunde inte spara mängd');
     }
@@ -284,25 +290,19 @@ function AppContent() {
     pieceLabel?: string | null;
   }) => {
     try {
-      if (ingredientModalData?.editingIngredient) {
+      if (activeModal?.type === 'ingredient' && activeModal.editingIngredient) {
         const updated = await updateIngredientMutation.mutateAsync({
-          id: ingredientModalData.editingIngredient.id,
+          id: activeModal.editingIngredient.id,
           data: ingredientData,
         });
-        setIngredientModalData(null);
-        if (amountModalData && amountModalData.ingredient.id === updated.id) {
-          setAmountModalData({
-            ...amountModalData,
-            ingredient: updated,
-          });
-        }
+        setActiveModal(null);
       } else {
         const created = await createIngredientMutation.mutateAsync(ingredientData);
-        const targetMeal = ingredientModalData?.targetMealType || activeLogMeal || 'breakfast';
-        setIngredientModalData(null);
+        const targetMeal = (activeModal?.type === 'ingredient' && activeModal.targetMealType) || 'breakfast';
 
         // Immediately prompt for amount to log
-        setAmountModalData({
+        setActiveModal({
+          type: 'amount',
           ingredient: created,
           mealType: targetMeal,
           isEditing: false,
@@ -318,9 +318,11 @@ function AppContent() {
   const handleDeleteIngredient = async (ingredientId: string) => {
     try {
       await deleteIngredientMutation.mutateAsync(ingredientId);
-      setIngredientModalData(null);
-      if (amountModalData?.ingredient.id === ingredientId) {
-        setAmountModalData(null);
+      if (
+        activeModal?.type === 'ingredient' ||
+        (activeModal?.type === 'amount' && activeModal.ingredient.id === ingredientId)
+      ) {
+        setActiveModal(null);
       }
     } catch (err: any) {
       console.error('Delete ingredient error:', err);
@@ -346,14 +348,24 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center text-slate-900 dark:text-slate-100 selection:bg-emerald-500 selection:text-slate-950 transition-colors">
       {/* Mobile container constraint: standard mobile device aspect ratio */}
-      <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 border-x border-slate-200 dark:border-slate-800/80 flex flex-col relative shadow-xl dark:shadow-2xl pb-6 transition-colors overflow-x-hidden">
+      <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 border-x border-slate-200 dark:border-slate-800/80 flex flex-col relative shadow-xl dark:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-colors overflow-x-hidden">
+        {/* PWA Safe-area insets for all modal overlays */}
+        <style>{`
+          .fixed.inset-0.z-50,
+          .fixed.inset-0.z-70,
+          #confirm-delete-modal-overlay {
+            padding-top: max(0.75rem, env(safe-area-inset-top)) !important;
+            padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+          }
+        `}</style>
+
         {/* Sticky Header with Date Navigator & Actions */}
         <DateHeader
           currentDate={currentDate}
           direction={direction}
           onDateChange={handleDateChange}
-          onOpenRecipes={() => setRecipeModalData({ initialMealToSave: null })}
-          onOpenProfile={() => setIsProfileOpen(true)}
+          onOpenRecipes={() => setActiveModal({ type: 'recipe', initialMealToSave: null })}
+          onOpenProfile={() => setActiveModal({ type: 'profile' })}
         />
 
         {/* Main scrollable body with directional animation & interactive drag swipe */}
@@ -397,7 +409,7 @@ function AppContent() {
                     key={type}
                     mealType={type}
                     items={itemsByMeal[type]}
-                    onOpenAdd={(meal) => setActiveLogMeal(meal)}
+                    onOpenAdd={(meal) => setActiveModal({ type: 'log', mealType: meal })}
                     onCopyYesterday={handleCopyYesterday}
                     onEditItem={handleEditItem}
                     onDeleteItem={handleDeleteItem}
@@ -411,108 +423,113 @@ function AppContent() {
         </div>
 
         {/* Log Modal (Search / Barcode scan / Recipes) */}
-        {activeLogMeal && (
+        {activeModal?.type === 'log' && (
           <LogModal
-            mealType={activeLogMeal}
+            mealType={activeModal.mealType}
             onSelectIngredient={(ingredient) => {
-              const meal = activeLogMeal;
-              setActiveLogMeal(null);
-              setAmountModalData({
+              const meal = activeModal.mealType;
+              setActiveModal({
+                type: 'amount',
                 ingredient,
                 mealType: meal,
                 isEditing: false,
+                returnToLogMeal: meal,
               });
             }}
             onRequestCreateIngredient={(prefilledBarcode) => {
-              const meal = activeLogMeal;
-              setActiveLogMeal(null);
-              setIngredientModalData({
+              const meal = activeModal.mealType;
+              setActiveModal({
+                type: 'ingredient',
                 initialBarcode: prefilledBarcode,
                 targetMealType: meal,
+                returnToLogMeal: meal,
               });
             }}
             onEditIngredient={(ingredient) => {
-              const meal = activeLogMeal;
-              setActiveLogMeal(null);
-              setIngredientModalData({
+              const meal = activeModal.mealType;
+              setActiveModal({
+                type: 'ingredient',
                 editingIngredient: ingredient,
                 targetMealType: meal,
+                returnToLogMeal: meal,
               });
             }}
             onSelectRecipe={handleLogRecipe}
-            onClose={() => setActiveLogMeal(null)}
+            onClose={() => setActiveModal(null)}
           />
         )}
 
         {/* Amount Input Modal */}
-        {amountModalData && (
+        {activeModal?.type === 'amount' && (
           <AmountModal
-            ingredient={amountModalData.ingredient}
-            mealType={amountModalData.mealType}
-            isEditing={amountModalData.isEditing}
+            ingredient={activeModal.ingredient}
+            mealType={activeModal.mealType}
+            isEditing={activeModal.isEditing}
             isSubmitting={logMealMutation.isPending || updateMealMutation.isPending}
-            initialAmount={amountModalData.initialAmount}
-            initialUnit={amountModalData.initialUnit}
+            initialAmount={activeModal.initialAmount}
+            initialUnit={activeModal.initialUnit}
             onConfirm={handleConfirmAmount}
             onClose={() => {
-              const mt = amountModalData.mealType;
-              const wasEditing = amountModalData.isEditing;
-              setAmountModalData(null);
-              if (mt && !wasEditing) {
-                setActiveLogMeal(mt);
+              const returnMeal = activeModal.returnToLogMeal;
+              const wasEditing = activeModal.isEditing;
+              if (returnMeal && !wasEditing) {
+                setActiveModal({ type: 'log', mealType: returnMeal });
+              } else {
+                setActiveModal(null);
               }
             }}
           />
         )}
 
         {/* Create/Edit Ingredient in Global Library Modal */}
-        {ingredientModalData && (
+        {activeModal?.type === 'ingredient' && (
           <IngredientModal
-            initialBarcode={ingredientModalData.initialBarcode}
-            editingIngredient={ingredientModalData.editingIngredient}
+            initialBarcode={activeModal.initialBarcode}
+            editingIngredient={activeModal.editingIngredient}
             isSubmitting={createIngredientMutation.isPending || updateIngredientMutation.isPending}
             isDeleting={deleteIngredientMutation.isPending}
             onSave={handleSaveIngredient}
             onDelete={handleDeleteIngredient}
             onClose={() => {
-              const targetMeal = ingredientModalData.targetMealType;
-              const wasEditing = Boolean(ingredientModalData.editingIngredient);
-              setIngredientModalData(null);
-              if (targetMeal && !wasEditing) {
-                setActiveLogMeal(targetMeal);
+              const returnMeal = activeModal.returnToLogMeal;
+              const wasEditing = Boolean(activeModal.editingIngredient);
+              if (returnMeal && !wasEditing) {
+                setActiveModal({ type: 'log', mealType: returnMeal });
+              } else {
+                setActiveModal(null);
               }
             }}
           />
         )}
 
         {/* Saved Recipes Manager Modal */}
-        {recipeModalData && (
+        {activeModal?.type === 'recipe' && (
           <RecipeModal
-            initialMealToSave={recipeModalData.initialMealToSave}
-            onClose={() => setRecipeModalData(null)}
+            initialMealToSave={activeModal.initialMealToSave}
+            onClose={() => setActiveModal(null)}
           />
         )}
 
         {/* Copy Yesterday Meal Chooser Modal */}
-        {copyYesterdayTarget && (
+        {activeModal?.type === 'copyYesterday' && (
           <CopyYesterdayModal
-            targetMealType={copyYesterdayTarget}
+            targetMealType={activeModal.targetMealType}
             currentDate={currentDate}
             onCopy={handleExecuteCopyYesterday}
-            onClose={() => setCopyYesterdayTarget(null)}
+            onClose={() => setActiveModal(null)}
           />
         )}
 
         {/* Profile & Goals Modal */}
-        {isProfileOpen && (
-          <ProfileModal onClose={() => setIsProfileOpen(false)} />
+        {activeModal?.type === 'profile' && (
+          <ProfileModal onClose={() => setActiveModal(null)} />
         )}
 
         {/* Global Error-Only Toast */}
         {errorToast && (
           <div
             role="alert"
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
+            className="fixed top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-200" />

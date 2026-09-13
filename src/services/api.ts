@@ -14,25 +14,37 @@ async function getHeaders(): Promise<HeadersInit> {
     'Content-Type': 'application/json',
   };
   if (currentUser) {
-    headers['Authorization'] = `Bearer ${currentUser.uid}`;
+    try {
+      const idToken = await currentUser.getIdToken();
+      headers['Authorization'] = `Bearer ${idToken}`;
+    } catch (e) {
+      console.error('Failed to get Firebase ID token:', e);
+    }
   }
   return headers;
 }
 
 const syncPromises = new Map<string, Promise<User>>();
 
-async function syncUserWithBackend(fbUser: { uid: string; email?: string | null; displayName?: string | null }): Promise<User> {
+async function syncUserWithBackend(fbUser: { uid: string; email?: string | null; displayName?: string | null; getIdToken?: () => Promise<string> }): Promise<User> {
   const existingPromise = syncPromises.get(fbUser.uid);
   if (existingPromise) {
     return existingPromise;
   }
   const promise = (async () => {
     try {
+      let token = fbUser.uid;
+      if (typeof fbUser.getIdToken === 'function') {
+        token = await fbUser.getIdToken();
+      } else if (auth.currentUser) {
+        token = await auth.currentUser.getIdToken();
+      }
+
       const res = await fetch('/api/users/sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${fbUser.uid}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           id: fbUser.uid,

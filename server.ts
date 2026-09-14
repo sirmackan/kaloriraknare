@@ -229,7 +229,11 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 export async function startServer() {
-  await runMigrations();
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.warn('[db] Skipping runtime migrations due to error:', err);
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     const { createServer } = await import('vite');

@@ -12,13 +12,21 @@ export async function runMigrations() {
     return;
   }
 
+  // In production deployments (Cloud Run), the application runs under restricted
+  // database credentials (SQL_USER) which do not have DDL/CREATE SCHEMA permissions.
+  // Schema updates are managed via Cloud SQL UpdateSchema.
+  if (!process.env.SQL_ADMIN_USER) {
+    console.log('[db] SQL_ADMIN_USER is not set. Skipping runtime migrations in production environment.');
+    return;
+  }
+
   const host = process.env.SQL_HOST;
   const database = process.env.SQL_DB_NAME;
-  const user = process.env.SQL_ADMIN_USER || process.env.SQL_USER;
-  const password = process.env.SQL_ADMIN_PASSWORD || process.env.SQL_PASSWORD;
+  const user = process.env.SQL_ADMIN_USER;
+  const password = process.env.SQL_ADMIN_PASSWORD;
 
   if (!host || !database || !user || !password) {
-    console.warn('[db] Missing database environment variables, skipping migrations.');
+    console.warn('[db] Incomplete database admin credentials, skipping migrations.');
     return;
   }
 
@@ -37,11 +45,11 @@ export async function runMigrations() {
     await migrate(migrationDb, { migrationsFolder });
     console.log('[db] Database migrations are up to date.');
   } catch (error) {
-    console.error('[db] Migration run failed:', error);
-    throw error;
+    console.warn('[db] Migration run encountered an issue (continuing startup):', error);
   } finally {
     await migrationPool.end().catch((err) => {
       console.warn('[db] Failed to close migration pool cleanly:', err);
     });
   }
 }
+

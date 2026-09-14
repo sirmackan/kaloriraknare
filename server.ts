@@ -5,6 +5,7 @@ import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import { z, type ZodType } from 'zod';
 import firebaseConfigJson from './firebase-applet-config.json' with { type: 'json' };
 import { pool } from './src/db/index.ts';
+import { runMigrations } from './src/db/migrate.ts';
 import {
   InvalidReferenceError,
   NotFoundError,
@@ -228,6 +229,8 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 export async function startServer() {
+  await runMigrations();
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer } = await import('vite');
     const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });

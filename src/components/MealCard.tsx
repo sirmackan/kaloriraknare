@@ -106,7 +106,6 @@ export const MealCard: React.FC<MealCardProps> = ({
               pieceWeight={item.pieceWeight}
               calories={item.calories}
               protein={item.protein}
-              isQuick={!item.ingredientId}
               onEdit={() => onEditItem(item)}
               onDelete={() => onDeleteItem(item)}
             />

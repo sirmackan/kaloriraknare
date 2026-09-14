@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -25,28 +25,17 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   onConfirm,
   onClose,
 }) => {
-  const dialogRef = useDialogAccessibility(onClose, isDeleting, isOpen);
-  if (!isOpen) return null;
-
   return (
-    <div
-      id="confirm-delete-modal-overlay"
-      className="fixed inset-0 z-70 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isDeleting) {
-          onClose();
-        }
-      }}
+    <ModalShell
+      active={isOpen}
+      backdropId="confirm-delete-modal-overlay"
+      backdropClassName="z-70 p-4 animate-in fade-in duration-150"
+      dialogId="confirm-delete-modal-card"
+      dialogClassName="rounded-3xl p-6 space-y-4"
+      titleId="confirm-delete-title"
+      preventClose={isDeleting}
+      onClose={onClose}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-delete-title"
-        tabIndex={-1}
-        id="confirm-delete-modal-card"
-        className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl text-slate-900 dark:text-slate-100 space-y-4 transition-colors"
-      >
         <div className="flex items-start justify-between">
           <div className="w-12 h-12 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6" />
@@ -108,7 +97,6 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
             )}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

@@ -30,6 +30,8 @@ describe('rendered component contracts', () => {
     assert.match(html, />Antal st</);
     assert.match(html, />Vikt \/ Volym \(/);
     assert.match(html, /id="unit-base-btn"/);
+    assert.doesNotMatch(html, /Snabbval|quick-inc-/);
+    assert.match(html, /Logga i receptet/);
   });
 
   it('shows remaining protein only while below the goal', () => {
@@ -78,7 +80,6 @@ describe('rendered component contracts', () => {
       baseUnit: 'g',
       calories: 650,
       protein: 42,
-      isQuick: true,
       onEdit: noop,
       onDelete: noop,
     }));
@@ -88,6 +89,7 @@ describe('rendered component contracts', () => {
     assert.match(html, /42<!-- --> g protein/);
     assert.match(html, /aria-label="Ändra mängd"/);
     assert.match(html, /aria-label="Ta bort"/);
+    assert.doesNotMatch(html, /Snabblogg/);
   });
 
   it('includes quick entries in meal totals and renders item rows cleanly', () => {
@@ -118,6 +120,7 @@ describe('rendered component contracts', () => {
     assert.match(html, /540/);
     assert.match(html, /50\.5/);
     assert.match(html, /Sås &amp; tillbehör/);
+    assert.doesNotMatch(html, /Snabblogg/);
   });
 
   it('renders the quick-log form with all required inputs and action', () => {

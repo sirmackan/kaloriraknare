@@ -4,7 +4,7 @@ import type { MealItem, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
 import { addDays, formatHeaderDate } from '../utils/date';
 import { useMealsQuery } from '../hooks/useNutritionQueries';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface CopyYesterdayModalProps {
   targetMealType: MealType;
@@ -24,7 +24,6 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(() => addDays(currentDate, -1));
   const [copyingSource, setCopyingSource] = useState<MealType | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const dialogRef = useDialogAccessibility(onClose, copyingSource !== null);
 
   const { data: items = [], isLoading: loading, isError: loadingFailed, refetch } = useMealsQuery(selectedDate, true);
 
@@ -67,24 +66,15 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
   const isSelectedYesterday = selectedDate === yesterdayDate;
 
   return (
-    <div
-      id="copy-yesterday-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && copyingSource === null) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
+    <ModalShell
+      backdropId="copy-yesterday-modal-backdrop"
+      backdropClassName="z-50 p-3 overflow-y-auto"
+      dialogId="copy-yesterday-modal"
+      dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col"
+      titleId="copy-meal-title"
+      preventClose={copyingSource !== null}
+      onClose={onClose}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="copy-meal-title"
-        tabIndex={-1}
-        id="copy-yesterday-modal"
-        className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto transition-colors"
-      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
@@ -305,7 +295,6 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

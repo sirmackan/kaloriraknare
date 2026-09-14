@@ -15,7 +15,6 @@ export interface FoodItemRowProps {
   onEdit: () => void;
   onDelete: () => void;
   idPrefix?: string;
-  isQuick?: boolean;
 }
 
 export const FoodItemRow: React.FC<FoodItemRowProps> = ({

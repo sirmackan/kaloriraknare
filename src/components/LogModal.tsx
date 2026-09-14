@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap, Check } from 'lucide-react';
+import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap } from 'lucide-react';
 import type { Ingredient, MealType, Recipe, MealItem } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { api } from '../services/api';
@@ -9,7 +9,8 @@ import {
   useIngredientsQuery,
   useRecipesQuery,
 } from '../hooks/useNutritionQueries';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { LogSubmitButton } from './LogSubmitButton';
+import { ModalShell } from './ModalShell';
 
 interface LogModalProps {
   mealType: MealType;
@@ -59,7 +60,7 @@ export const LogModal: React.FC<LogModalProps> = ({
   const [isScanningCamera, setIsScanningCamera] = useState(false);
   const [loggingRecipeId, setLoggingRecipeId] = useState<string | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const dialogRef = useDialogAccessibility(onClose, isSubmittingQuick || loggingRecipeId !== null);
+  const preventClose = isSubmittingQuick || loggingRecipeId !== null;
 
   // Debounce search input by 280ms
   useEffect(() => {
@@ -122,16 +123,14 @@ export const LogModal: React.FC<LogModalProps> = ({
   };
 
   return (
-    <div
-      id="log-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isSubmittingQuick && loggingRecipeId === null) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
+    <ModalShell
+      backdropId="log-modal-backdrop"
+      backdropClassName="z-50 p-3 overflow-y-auto"
+      dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col animate-in fade-in duration-150"
+      titleId="log-modal-title"
+      preventClose={preventClose}
+      onClose={onClose}
     >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="log-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-150 transition-colors">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
           <div>
@@ -580,28 +579,16 @@ export const LogModal: React.FC<LogModalProps> = ({
 
             {/* Submit button */}
             <div className="pt-2">
-              <button
-                type="submit"
+              <LogSubmitButton
                 id="submit-quick-log-btn"
+                destination={MEAL_DEFINITE_LABELS[mealType]}
                 disabled={isSubmittingQuick || (!quickCalories && !quickProtein)}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-98 disabled:opacity-50 text-slate-950 text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
-              >
-                {isSubmittingQuick ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                    <span>{editingQuickItem ? 'Sparar ändring...' : `Loggar i ${MEAL_DEFINITE_LABELS[mealType]}...`}</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 stroke-[3]" />
-                    <span>{editingQuickItem ? 'Spara ändring' : `Logga i ${MEAL_DEFINITE_LABELS[mealType]}`}</span>
-                  </>
-                )}
-              </button>
+                isEditing={Boolean(editingQuickItem)}
+                isSubmitting={isSubmittingQuick}
+              />
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </ModalShell>
   );
 };

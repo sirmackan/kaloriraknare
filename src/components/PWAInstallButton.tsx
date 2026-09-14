@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
 import { usePWAInstall } from './usePWAInstall';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const closeIOSGuide = () => setShowIOSGuide(false);
-  const dialogRef = useDialogAccessibility(closeIOSGuide, false, showIOSGuide);
 
   // If already running as an installed PWA, hide the button
   if (isInstalled) {
@@ -41,9 +40,14 @@ export const PWAInstallButton: React.FC = () => {
           <span>Installera</span>
         </button>
 
-        {showIOSGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 overflow-y-auto">
-            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ios-guide-title" tabIndex={-1} className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 my-auto transition-colors">
+        <ModalShell
+          active={showIOSGuide}
+          backdropId="ios-guide-modal-backdrop"
+          backdropClassName="z-50 p-4 overflow-y-auto"
+          dialogClassName="rounded-2xl p-5"
+          titleId="ios-guide-title"
+          onClose={closeIOSGuide}
+        >
               <div className="flex items-center justify-between mb-3">
                 <h3 id="ios-guide-title" className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -70,9 +74,7 @@ export const PWAInstallButton: React.FC = () => {
               >
                 Uppfattat
               </button>
-            </div>
-          </div>
-        )}
+        </ModalShell>
       </>
     );
   }

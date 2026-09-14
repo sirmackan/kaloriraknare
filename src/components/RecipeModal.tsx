@@ -15,7 +15,7 @@ import {
   resolveIngredientsBatch,
 } from '../hooks/useNutritionQueries';
 import { useAuth } from '../context/AuthContext';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface RecipeModalProps {
   initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
@@ -62,7 +62,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [addingIngredient, setAddingIngredient] = useState<Ingredient | null>(null);
   const [editingRecipeItemIndex, setEditingRecipeItemIndex] = useState<number | null>(null);
   const [recipeError, setRecipeError] = useState<string | null>(null);
-  const dialogRef = useDialogAccessibility(onClose, createRecipeMutation.isPending || deleteRecipeMutation.isPending);
+  const preventClose = createRecipeMutation.isPending || deleteRecipeMutation.isPending;
 
   useEffect(() => {
     if (initialMealToSave && initialMealToSave.items.length > 0 && !hasInitializedFromMeal.current) {
@@ -166,16 +166,15 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   };
 
   return (
-    <div
-      id="recipe-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !createRecipeMutation.isPending && !deleteRecipeMutation.isPending) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
-    >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="recipe-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto transition-colors">
+    <>
+      <ModalShell
+        backdropId="recipe-modal-backdrop"
+        backdropClassName="z-50 p-3 overflow-y-auto"
+        dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col"
+        titleId="recipe-modal-title"
+        preventClose={preventClose}
+        onClose={onClose}
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
@@ -468,7 +467,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </ModalShell>
 
       <ConfirmDeleteModal
         isOpen={Boolean(recipeToDelete)}
@@ -502,6 +501,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           onClose={() => setEditingRecipeItemIndex(null)}
         />
       )}
-    </div>
+    </>
   );
 };

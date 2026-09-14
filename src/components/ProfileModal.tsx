@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, Target, User as UserIcon, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface ProfileModalProps {
   onClose: () => void;
@@ -18,7 +18,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
   const [goalError, setGoalError] = useState<string | null>(null);
   const [isSavingGoals, setIsSavingGoals] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const dialogRef = useDialogAccessibility(onClose, isSavingGoals || isLoggingOut);
+  const preventClose = isSavingGoals || isLoggingOut;
 
   const handleLogout = async () => {
     try {
@@ -64,16 +64,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div
-      id="profile-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isSavingGoals && !isLoggingOut) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
+    <ModalShell
+      backdropId="profile-modal-backdrop"
+      backdropClassName="z-50 p-3 overflow-y-auto"
+      dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto"
+      titleId="profile-modal-title"
+      preventClose={preventClose}
+      onClose={onClose}
     >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto my-auto transition-colors">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
@@ -259,7 +257,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

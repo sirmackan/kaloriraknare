@@ -3,7 +3,7 @@ import { X, Check, Barcode, Trash2, ScanBarcode } from 'lucide-react';
 import type { BaseUnit, Ingredient } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BarcodeScanner } from './BarcodeScanner';
-import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { ModalShell } from './ModalShell';
 
 interface IngredientModalProps {
   initialBarcode?: string;
@@ -54,7 +54,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
   const isSubmitting = isSubmittingProp !== undefined ? isSubmittingProp : localSubmitting;
   const isDeleting = isDeletingProp !== undefined ? isDeletingProp : localDeleting;
-  const dialogRef = useDialogAccessibility(onClose, isSubmitting || isDeleting);
+  const preventClose = isSubmitting || isDeleting;
 
   const handleConfirmDelete = async () => {
     if (!editingIngredient || !onDelete) return;
@@ -136,16 +136,15 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
   };
 
   return (
-    <div
-      id="ingredient-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isSubmitting && !isDeleting) {
-          onClose();
-        }
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto"
-    >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ingredient-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto my-auto transition-colors">
+    <>
+      <ModalShell
+        backdropId="ingredient-modal-backdrop"
+        backdropClassName="z-50 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto"
+        dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto"
+        titleId="ingredient-modal-title"
+        preventClose={preventClose}
+        onClose={onClose}
+      >
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 id="ingredient-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
@@ -416,7 +415,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
             )}
           </div>
         </form>
-      </div>
+      </ModalShell>
 
       <ConfirmDeleteModal
         isOpen={showDeleteModal}
@@ -429,6 +428,6 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
           if (!isDeleting) setShowDeleteModal(false);
         }}
       />
-    </div>
+    </>
   );
 };

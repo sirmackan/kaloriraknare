@@ -5,7 +5,6 @@ import {
   isPieceUnit,
   getEffectiveWeight,
   calculateBatchTotals,
-  getDisplayPieceLabel,
   type NutritionSource,
   type BatchNutritionItem,
 } from '../../src/utils/nutrition';
@@ -47,7 +46,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
         assert.equal(resG.protein, 0, `Negative amount ${neg} must produce 0 protein`);
         assert.equal(resG.effectiveWeight, 0, `Negative amount ${neg} must produce 0 effectiveWeight`);
 
-        const resPiece = calculateNutrition(neg, 'ägg', swedishIngredients.agg);
+        const resPiece = calculateNutrition(neg, 'st', swedishIngredients.agg);
         assert.equal(resPiece.calories, 0);
         assert.equal(resPiece.protein, 0);
         assert.equal(resPiece.effectiveWeight, 0);
@@ -64,11 +63,11 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
       assert.equal(halfEgg.calories, 39);
       assert.equal(halfEgg.protein, 3.5);
 
-      // 0.25 portion havregryn (40g/portion, 370 kcal/100g, 13g protein/100g)
+      // 0.25 st havregryn (40g/st, 370 kcal/100g, 13g protein/100g)
       // Effective weight = 0.25 * 40 = 10g
       // Calories = Math.round((10 / 100) * 370) = 37 kcal
       // Protein = Math.round((10 / 100) * 13 * 10) / 10 = 1.3g
-      const quarterOats = calculateNutrition(0.25, 'portion', swedishIngredients.havregryn);
+      const quarterOats = calculateNutrition(0.25, 'st', swedishIngredients.havregryn);
       assert.equal(quarterOats.effectiveWeight, 10);
       assert.equal(quarterOats.calories, 37);
       assert.equal(quarterOats.protein, 1.3);
@@ -84,36 +83,32 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
 
       // Floating-point edge: 0.1 + 0.2 = 0.30000000000000004
       const floatSum = 0.1 + 0.2;
-      const floatRes = calculateNutrition(floatSum, 'skiva', swedishIngredients.prastost);
+      const floatRes = calculateNutrition(floatSum, 'st', swedishIngredients.prastost);
       assert.ok(!isNaN(floatRes.calories));
       assert.ok(!isNaN(floatRes.protein));
       assert.equal(floatRes.calories, Math.round((floatSum * 20 / 100) * 380));
     });
 
-    it('CALC-ADV-04: Custom piece labels (ägg, skiva, skopa, portion) handle case variations and whitespace', () => {
-      // Test ägg variations
-      const aggUpper = calculateNutrition(2, 'ÄGG', swedishIngredients.agg);
-      assert.equal(aggUpper.effectiveWeight, 110, 'Uppercase ÄGG must match');
-      assert.equal(aggUpper.calories, 157);
+    it('CALC-ADV-04: Piece unit "st" handles case variations and whitespace, rejecting non-st labels', () => {
+      // Test st variations
+      const stUpper = calculateNutrition(2, 'ST', swedishIngredients.agg);
+      assert.equal(stUpper.effectiveWeight, 110, 'Uppercase ST must match');
+      assert.equal(stUpper.calories, 157);
 
-      const aggPadded = calculateNutrition(2, '  ägg  ', swedishIngredients.agg);
-      assert.equal(aggPadded.effectiveWeight, 110, 'Whitespace padded ägg must match');
-      assert.equal(aggPadded.calories, 157);
+      const stPadded = calculateNutrition(2, '  st  ', swedishIngredients.agg);
+      assert.equal(stPadded.effectiveWeight, 110, 'Whitespace padded st must match');
+      assert.equal(stPadded.calories, 157);
 
-      // Test skiva variations
-      const skivaMixed = calculateNutrition(3, 'sKiVa', swedishIngredients.prastost);
-      assert.equal(skivaMixed.effectiveWeight, 60, 'Mixed case sKiVa must match');
-      assert.equal(skivaMixed.calories, 228);
+      const stMixed = calculateNutrition(3, 'sT', swedishIngredients.prastost);
+      assert.equal(stMixed.effectiveWeight, 60, 'Mixed case sT must match');
+      assert.equal(stMixed.calories, 228);
 
-      // Test portion variations
-      const portionPadded = calculateNutrition(1.5, '  Portion  ', swedishIngredients.havregryn);
-      assert.equal(portionPadded.effectiveWeight, 60);
-      assert.equal(portionPadded.calories, 222);
+      // Custom labels are NOT piece units - they fall back to base unit amounts (grams)
+      const aggNonPiece = calculateNutrition(2, 'ägg', swedishIngredients.agg);
+      assert.equal(aggNonPiece.effectiveWeight, 2, 'Custom unit ägg is not a piece unit');
 
-      // Test skopa variations
-      const skopaUpper = calculateNutrition(1, 'SKOPA', swedishIngredients.protein_skopa);
-      assert.equal(skopaUpper.effectiveWeight, 30);
-      assert.equal(skopaUpper.calories, 117);
+      const skivaNonPiece = calculateNutrition(3, 'skiva', swedishIngredients.prastost);
+      assert.equal(skivaNonPiece.effectiveWeight, 3, 'Custom unit skiva is not a piece unit');
     });
 
     it('CALC-ADV-05: Missing, null, zero or negative pieceWeight falls back safely to amount', () => {
@@ -123,7 +118,6 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
         caloriesPer100: 200,
         proteinPer100: 10,
         pieceWeight: null,
-        pieceLabel: 'st',
       };
       const resNull = calculateNutrition(5, 'st', ingNullWeight);
       assert.equal(resNull.effectiveWeight, 5, 'Null pieceWeight must fall back to amount');
@@ -166,12 +160,12 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
 
     it('CALC-ADV-06: Property-based invariant: Batch totals match individual item calculation sum', () => {
       const batchItems: BatchNutritionItem[] = [
-        { amount: 2, loggedUnit: 'ägg', source: swedishIngredients.agg },
-        { amount: 3, loggedUnit: 'skiva', source: swedishIngredients.prastost },
+        { amount: 2, loggedUnit: 'st', source: swedishIngredients.agg },
+        { amount: 3, loggedUnit: 'st', source: swedishIngredients.prastost },
         { amount: 15, loggedUnit: 'g', source: swedishIngredients.bregott },
         { amount: 200, loggedUnit: 'ml', source: swedishIngredients.mjolk },
-        { amount: 1.5, loggedUnit: 'portion', source: swedishIngredients.havregryn },
-        { amount: 1, loggedUnit: 'skopa', source: swedishIngredients.protein_skopa },
+        { amount: 1.5, loggedUnit: 'st', source: swedishIngredients.havregryn },
+        { amount: 1, loggedUnit: 'st', source: swedishIngredients.protein_skopa },
         { amount: 150, loggedUnit: 'g', source: swedishIngredients.kyckling },
       ];
 
@@ -190,13 +184,14 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
       assert.equal(batchTotals.totalProtein, Math.round(manualProteinSum * 10) / 10, 'Total protein must match rounded sum');
     });
 
-    it('CALC-ADV-07: getDisplayPieceLabel handles empty strings, null, undefined and custom values', () => {
-      assert.equal(getDisplayPieceLabel('ägg'), 'ägg');
-      assert.equal(getDisplayPieceLabel('  skiva  '), 'skiva');
-      assert.equal(getDisplayPieceLabel(null), 'st');
-      assert.equal(getDisplayPieceLabel(undefined), 'st');
-      assert.equal(getDisplayPieceLabel(''), 'st');
-      assert.equal(getDisplayPieceLabel('   '), 'st');
+    it('CALC-ADV-07: isPieceUnit strictly matches "st" and rejects all other units', () => {
+      assert.equal(isPieceUnit('st'), true);
+      assert.equal(isPieceUnit('ST'), true);
+      assert.equal(isPieceUnit(' st '), true);
+      assert.equal(isPieceUnit('ägg'), false);
+      assert.equal(isPieceUnit('skiva'), false);
+      assert.equal(isPieceUnit('g'), false);
+      assert.equal(isPieceUnit(''), false);
     });
   });
 
@@ -215,7 +210,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
           mealType: 'breakfast',
           ingredientId: swedishIngredients.agg.id,
           amount: 2,
-          loggedUnit: 'ägg',
+          loggedUnit: 'st',
         },
         {
           id: 'meal_ok_2',
@@ -223,7 +218,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
           mealType: 'breakfast',
           ingredientId: swedishIngredients.ragbrod.id,
           amount: 2,
-          loggedUnit: 'skiva',
+          loggedUnit: 'st',
         },
       ];
 
@@ -303,7 +298,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
           mealType: 'dinner',
           ingredientId: swedishIngredients.ragbrod.id,
           amount: 1,
-          loggedUnit: 'skiva',
+          loggedUnit: 'st',
         },
       ];
 
@@ -521,7 +516,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
           ingredientId: swedishIngredients.agg.id,
           ingredientName: swedishIngredients.agg.name,
           amount: 2,
-          loggedUnit: 'ägg' as any,
+          loggedUnit: 'st' as any,
           baseUnit: 'g',
           pieceWeight: 55,
           calories: 157, // Rounded integer from database
@@ -536,7 +531,7 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
           ingredientId: swedishIngredients.prastost.id,
           ingredientName: swedishIngredients.prastost.name,
           amount: 2,
-          loggedUnit: 'skiva' as any,
+          loggedUnit: 'st' as any,
           baseUnit: 'g',
           pieceWeight: 20,
           calories: 152,
@@ -662,36 +657,30 @@ describe('Tier 5 — Adversarial Stress Test & Challenger Verification', () => {
       assert.equal(nutrition.protein, 57.5);
     });
 
-    it('CALC-ADV-11: EMPIRICAL DEFECT PROOF: AmountModal.tsx inline calculation vs Centralized Nutrition Engine', () => {
-      // In src/components/AmountModal.tsx lines 44-49:
-      // const effectiveGrams = unit === 'st' && ingredient.pieceWeight
-      //   ? numericAmount * ingredient.pieceWeight
-      //   : numericAmount;
-      // const calcCalories = Math.round((effectiveGrams / 100) * ingredient.caloriesPer100);
-      // const calcProtein = Math.round(((effectiveGrams / 100) * ingredient.proteinPer100) * 10) / 10;
-
-      const egg = swedishIngredients.agg; // pieceWeight: 55, caloriesPer100: 143, proteinPer100: 12.6, pieceLabel: 'ägg'
+    it('CALC-ADV-11: Piece simplification: unit "st" calculates using pieceWeight across both centralized engine and AmountModal', () => {
+      const egg = swedishIngredients.agg; // pieceWeight: 55, caloriesPer100: 143, proteinPer100: 12.6
       const amount = 2;
-      const customUnit: string = 'ägg';
+      const unit = 'st';
 
-      // 1. Centralized helper (the required pure calculation contract):
-      const centralized = calculateNutrition(amount, customUnit, egg);
+      // 1. Centralized helper:
+      const centralized = calculateNutrition(amount, unit, egg);
       assert.equal(centralized.calories, 157, 'Centralized helper computes 157 kcal');
       assert.equal(centralized.protein, 13.9, 'Centralized helper computes 13.9g');
       assert.equal(centralized.effectiveWeight, 110, 'Centralized helper computes 110g');
 
-      // 2. AmountModal line 44 inline calculation logic:
-      const modalEffectiveGrams = (customUnit === 'st' && egg.pieceWeight)
+      // 2. AmountModal calculation logic:
+      const modalEffectiveGrams = (unit === 'st' && egg.pieceWeight)
         ? amount * egg.pieceWeight
         : amount;
       const modalCalcCalories = Math.round((modalEffectiveGrams / 100) * egg.caloriesPer100);
       const modalCalcProtein = Math.round(((modalEffectiveGrams / 100) * egg.proteinPer100) * 10) / 10;
 
-      // Empirical proof: When unit is "ägg", AmountModal fails to multiply pieceWeight because unit !== 'st'.
-      // It falls back to numericAmount (2g instead of 110g), displaying 3 kcal instead of 157 kcal!
-      assert.equal(modalEffectiveGrams, 2, 'AmountModal treats 2 ägg as 2g');
-      assert.equal(modalCalcCalories, 3, 'AmountModal displays 3 kcal (-98.1% undercount)');
-      assert.equal(modalCalcProtein, 0.3, 'AmountModal displays 0.3g protein (-97.8% undercount)');
+      assert.equal(modalEffectiveGrams, centralized.effectiveWeight);
+      assert.equal(modalCalcCalories, centralized.calories);
+      assert.equal(modalCalcProtein, centralized.protein);
+
+      // Non-'st' unit (like 'ägg') is strictly not a piece unit
+      assert.equal(isPieceUnit('ägg'), false);
     });
   });
 });

@@ -31,7 +31,7 @@ describe('Tier 1 — DB-JSONB: Native PostgreSQL jsonb Recipe Storage', () => {
         ingredientId: 'ing_brod',
         ingredientName: 'Rågbröd',
         amount: 1,
-        loggedUnit: 'skiva' as any,
+        loggedUnit: 'st',
         baseUnit: 'g',
         pieceWeight: 40,
         calories: 88,

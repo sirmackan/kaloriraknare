@@ -23,7 +23,6 @@ export const ingredients = pgTable(
     caloriesPer100: doublePrecision('calories_per_100').notNull().default(0),
     proteinPer100: doublePrecision('protein_per_100').notNull().default(0),
     pieceWeight: doublePrecision('piece_weight'),
-    pieceLabel: text('piece_label'),
     createdByUserId: text('created_by_user_id').notNull().default('system'),
     createdByName: text('created_by_name'),
     isDeleted: boolean('is_deleted').notNull().default(false),

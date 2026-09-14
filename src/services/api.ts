@@ -186,7 +186,6 @@ export const api = {
     caloriesPer100: number;
     proteinPer100: number;
     pieceWeight?: number | null;
-    pieceLabel?: string | null;
   }): Promise<Ingredient> {
     const headers = await getHeaders();
     const res = await fetch('/api/ingredients', {
@@ -205,7 +204,6 @@ export const api = {
     caloriesPer100: number;
     proteinPer100: number;
     pieceWeight?: number | null;
-    pieceLabel?: string | null;
   }): Promise<Ingredient> {
     const headers = await getHeaders();
     const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, {

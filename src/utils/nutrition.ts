@@ -5,7 +5,6 @@ export interface NutritionSource {
   caloriesPer100: number;
   proteinPer100: number;
   pieceWeight?: number | null;
-  pieceLabel?: string | null;
 }
 
 export interface CalculatedNutrition {
@@ -21,40 +20,25 @@ export interface BatchNutritionItem {
 }
 
 /**
- * Determines whether a logged unit represents a piece/portion rather than base grams/ml.
- * Returns true for 'st', any match with pieceLabel, or any non-base unit.
+ * Determines whether a logged unit represents a piece ('st') rather than base grams/ml.
  */
-export function isPieceUnit(
-  loggedUnit: string,
-  baseUnit: string,
-  pieceLabel?: string | null
-): boolean {
+export function isPieceUnit(loggedUnit: string): boolean {
   if (!loggedUnit) return false;
-  const unitLower = loggedUnit.trim().toLowerCase();
-  const baseLower = (baseUnit || 'g').trim().toLowerCase();
-
-  if (unitLower === baseLower) return false;
-  if (unitLower === 'g' || unitLower === 'ml') return false;
-  if (unitLower === 'st') return true;
-  if (pieceLabel && unitLower === pieceLabel.trim().toLowerCase()) return true;
-
-  // Any non-base unit (e.g. custom piece label like "skiva", "ägg", "skopa", "portion")
-  return true;
+  return loggedUnit.trim().toLowerCase() === 'st';
 }
 
 /**
  * Returns the effective weight/volume in base units (g or ml).
- * If the unit is a piece unit and pieceWeight is defined, returns amount * pieceWeight.
+ * If the unit is 'st' and pieceWeight is defined, returns amount * pieceWeight.
  */
 export function getEffectiveWeight(
   amount: number,
   loggedUnit: string,
-  source: { unit: string; pieceWeight?: number | null; pieceLabel?: string | null }
+  source: { pieceWeight?: number | null }
 ): number {
   if (!amount || isNaN(amount) || amount <= 0) return 0;
 
-  const isPiece = isPieceUnit(loggedUnit, source.unit, source.pieceLabel);
-  if (isPiece && source.pieceWeight && source.pieceWeight > 0) {
+  if (isPieceUnit(loggedUnit) && source.pieceWeight && source.pieceWeight > 0) {
     return amount * source.pieceWeight;
   }
   return amount;
@@ -62,7 +46,7 @@ export function getEffectiveWeight(
 
 /**
  * Pure calculation of calories and protein from amount, logged unit, and ingredient source.
- * Formula: (amount * pieceWeight / 100) * caloriesPer100 for piece units.
+ * Formula: (amount * pieceWeight / 100) * caloriesPer100 for piece units ('st').
  * Calories rounded with Math.round. Protein rounded to 1 decimal: Math.round(val * 10) / 10.
  */
 export function calculateNutrition(
@@ -106,20 +90,4 @@ export function calculateBatchTotals(
     totalCalories,
     totalProtein: Math.round(totalProtein * 10) / 10,
   };
-}
-
-/**
- * Helper to display the appropriate piece label for buttons and tags.
- * Falls back to 'st' if pieceLabel is empty or undefined.
- */
-export function getDisplayPieceLabel(pieceLabel?: string | null): string {
-  return pieceLabel && pieceLabel.trim().length > 0 ? pieceLabel.trim() : 'st';
-}
-
-/**
- * Helper to display the formatted piece unit button label as "Antal (<unit>)".
- * e.g. "Antal (skiva)", "Antal (ägg)", "Antal (st)".
- */
-export function formatPieceUnitLabel(pieceLabel?: string | null): string {
-  return `Antal (${getDisplayPieceLabel(pieceLabel)})`;
 }

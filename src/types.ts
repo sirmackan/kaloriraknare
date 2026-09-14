@@ -20,7 +20,6 @@ export interface Ingredient {
   caloriesPer100: number; // kcal per 100g or 100ml
   proteinPer100: number; // g protein per 100g or 100ml
   pieceWeight?: number | null; // Weight or volume in g/ml for 1 piece (e.g. 55g for 1 egg)
-  pieceLabel?: string | null; // e.g. "st", "ägg", "skiva", "skopa"
   createdByUserId: string; // 'system' or user ID
   createdByName?: string;
   isDeleted?: boolean;

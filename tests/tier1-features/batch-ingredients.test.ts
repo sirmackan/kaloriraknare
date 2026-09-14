@@ -174,7 +174,6 @@ describe('Tier 1 — Requirement R2: Batch Ingredients & Waterfall Elimination',
       assert.equal(agg?.caloriesPer100, 143);
       assert.equal(agg?.proteinPer100, 12.6);
       assert.equal(agg?.pieceWeight, 55);
-      assert.equal(agg?.pieceLabel, 'ägg');
     });
 
     it('BATCH-01.5: Soft-deleted ingredients are excluded from batch lookup results', async () => {

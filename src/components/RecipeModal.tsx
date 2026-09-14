@@ -82,7 +82,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             caloriesPer100: 0,
             proteinPer100: 0,
             pieceWeight: item.pieceWeight,
-            pieceLabel: item.pieceLabel,
             createdByUserId: 'system',
             createdAt: new Date().toISOString(),
           };
@@ -408,7 +407,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                           loggedUnit={item.unit}
                           baseUnit={item.ingredient.unit}
                           pieceWeight={item.ingredient.pieceWeight}
-                          pieceLabel={item.ingredient.pieceLabel}
                           calories={calories}
                           protein={protein}
                           onEdit={() => setEditingRecipeItemIndex(idx)}

@@ -16,7 +16,6 @@ interface IngredientModalProps {
     caloriesPer100: number;
     proteinPer100: number;
     pieceWeight?: number | null;
-    pieceLabel?: string | null;
   }) => Promise<void> | void;
   onDelete?: (ingredientId: string) => Promise<void> | void;
   onClose: () => void;
@@ -45,9 +44,6 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
   );
   const [pieceWeight, setPieceWeight] = useState(
     editingIngredient?.pieceWeight ? String(editingIngredient.pieceWeight) : ''
-  );
-  const [pieceLabel, setPieceLabel] = useState(
-    editingIngredient?.pieceLabel || 'st'
   );
   const [error, setError] = useState<string | null>(null);
   const [localSubmitting, setLocalSubmitting] = useState(false);
@@ -125,7 +121,6 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
         caloriesPer100: cal,
         proteinPer100: pro,
         pieceWeight: pwNum,
-        pieceLabel: hasPieceWeight ? pieceLabel.trim() || 'st' : null,
       });
     } catch (err: any) {
       setError(err?.message || 'Ett fel uppstod när råvaran skulle sparas');
@@ -343,54 +338,31 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
             </label>
 
             {hasPieceWeight && (
-              <div className="grid grid-cols-2 gap-2.5 pt-1 animate-in fade-in duration-150">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    {unit === 'ml' ? 'Volym per styck (ml) *' : 'Vikt per styck (g) *'}
-                  </label>
-                  <input
-                    id="ingredient-piece-weight-input"
-                    name="item_piece_weight"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-form-type="other"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    placeholder="T.ex. 55"
-                    value={pieceWeight}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setPieceWeight(val);
-                      }
-                    }}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Benämning (valfritt)
-                  </label>
-                  <input
-                    id="ingredient-piece-label-input"
-                    name="item_piece_label"
-                    type="text"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-form-type="other"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    placeholder="st, ägg, skiva..."
-                    value={pieceLabel}
-                    onChange={(e) => setPieceLabel(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              <div className="pt-1 animate-in fade-in duration-150">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  {unit === 'ml' ? 'Volym per styck (ml) *' : 'Vikt per styck (g) *'}
+                </label>
+                <input
+                  id="ingredient-piece-weight-input"
+                  name="item_piece_weight"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  placeholder="T.ex. 55"
+                  value={pieceWeight}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(',', '.');
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setPieceWeight(val);
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
               </div>
             )}
           </div>

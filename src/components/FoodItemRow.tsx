@@ -10,7 +10,6 @@ export interface FoodItemRowProps {
   loggedUnit: LoggedUnit | string;
   baseUnit: BaseUnit;
   pieceWeight?: number | null;
-  pieceLabel?: string | null;
   calories: number;
   protein: number;
   onEdit: () => void;
@@ -26,7 +25,6 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
   loggedUnit,
   baseUnit,
   pieceWeight,
-  pieceLabel,
   calories,
   protein,
   onEdit,
@@ -34,7 +32,7 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
   idPrefix = 'item',
   isQuick = false,
 }) => {
-  const isPiece = isPieceUnit(loggedUnit, baseUnit, pieceLabel);
+  const isPiece = isPieceUnit(loggedUnit);
   const hasPieceWeight = isPiece && Boolean(pieceWeight && pieceWeight > 0);
   const gramEquivalent = hasPieceWeight ? Math.round(amount * pieceWeight!) : null;
 

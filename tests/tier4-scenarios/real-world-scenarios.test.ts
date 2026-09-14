@@ -16,8 +16,8 @@ describe('Tier 4 — Real-World Application Scenarios: Kaloriräknare Workflows'
 
     // 1. Breakfast (Frukost)
     const breakfastItems: BatchItemInput[] = [
-      { id: 'm_brk_1', date, mealType: 'breakfast', ingredientId: swedishIngredients.agg.id, amount: 2, loggedUnit: 'ägg' },
-      { id: 'm_brk_2', date, mealType: 'breakfast', ingredientId: swedishIngredients.ragbrod.id, amount: 1, loggedUnit: 'skiva' },
+      { id: 'm_brk_1', date, mealType: 'breakfast', ingredientId: swedishIngredients.agg.id, amount: 2, loggedUnit: 'st' },
+      { id: 'm_brk_2', date, mealType: 'breakfast', ingredientId: swedishIngredients.ragbrod.id, amount: 1, loggedUnit: 'st' },
       { id: 'm_brk_3', date, mealType: 'breakfast', ingredientId: swedishIngredients.bregott.id, amount: 10, loggedUnit: 'g' },
       { id: 'm_brk_4', date, mealType: 'breakfast', ingredientId: swedishIngredients.kaffe.id, amount: 200, loggedUnit: 'ml' },
     ];
@@ -33,14 +33,14 @@ describe('Tier 4 — Real-World Application Scenarios: Kaloriräknare Workflows'
     // 3. Dinner (Middag)
     const dinnerItems: BatchItemInput[] = [
       { id: 'm_din_1', date, mealType: 'dinner', ingredientId: swedishIngredients.kyckling.id, amount: 250, loggedUnit: 'g' },
-      { id: 'm_din_2', date, mealType: 'dinner', ingredientId: swedishIngredients.prastost.id, amount: 2, loggedUnit: 'skiva' },
+      { id: 'm_din_2', date, mealType: 'dinner', ingredientId: swedishIngredients.prastost.id, amount: 2, loggedUnit: 'st' },
     ];
     const loggedDinner = await db.addBatchMeals(userId, dinnerItems);
 
     // 4. Snack (Mellanmål)
     const snackItems: BatchItemInput[] = [
-      { id: 'm_snk_1', date, mealType: 'snack', ingredientId: swedishIngredients.havregryn.id, amount: 1, loggedUnit: 'portion' },
-      { id: 'm_snk_2', date, mealType: 'snack', ingredientId: swedishIngredients.protein_skopa.id, amount: 1, loggedUnit: 'skopa' },
+      { id: 'm_snk_1', date, mealType: 'snack', ingredientId: swedishIngredients.havregryn.id, amount: 1, loggedUnit: 'st' },
+      { id: 'm_snk_2', date, mealType: 'snack', ingredientId: swedishIngredients.protein_skopa.id, amount: 1, loggedUnit: 'st' },
       { id: 'm_snk_3', date, mealType: 'snack', ingredientId: swedishIngredients.mjolk.id, amount: 200, loggedUnit: 'ml' },
     ];
     const loggedSnack = await db.addBatchMeals(userId, snackItems);
@@ -79,16 +79,16 @@ describe('Tier 4 — Real-World Application Scenarios: Kaloriräknare Workflows'
   it('SCENARIO-02: Creating custom Swedish recipe "Klassisk Äggmacka" and verifying exact nutrition', () => {
     // 1. Ingredients assembled for recipe
     const recipeIngredients = [
-      { amount: 2, loggedUnit: 'ägg', source: swedishIngredients.agg },
-      { amount: 1, loggedUnit: 'skiva', source: swedishIngredients.ragbrod },
+      { amount: 2, loggedUnit: 'st', source: swedishIngredients.agg },
+      { amount: 1, loggedUnit: 'st', source: swedishIngredients.ragbrod },
       { amount: 10, loggedUnit: 'g', source: swedishIngredients.bregott },
     ];
 
     // 2. Compute exact recipe totals
     const totals = calculateBatchTotals(recipeIngredients);
 
-    // 2 ägg: (110 / 100) * 143 = 157 kcal, 13.9g protein
-    // 1 skiva rågbröd: (40 / 100) * 220 = 88 kcal, 2.8g protein
+    // 2 st ägg: (110 / 100) * 143 = 157 kcal, 13.9g protein
+    // 1 st rågbröd: (40 / 100) * 220 = 88 kcal, 2.8g protein
     // 10g bregott: (10 / 100) * 710 = 71 kcal, 0.1g protein
     // Expected Totals: 157 + 88 + 71 = 316 kcal
     // Expected Protein: 13.9 + 2.8 + 0.1 = 16.8g protein
@@ -125,8 +125,8 @@ describe('Tier 4 — Real-World Application Scenarios: Kaloriräknare Workflows'
 
     // Yesterday's logged items (breakfast and lunch)
     await db.addBatchMeals(userId, [
-      { id: 'y_brk_1', date: yesterday, mealType: 'breakfast', ingredientId: swedishIngredients.agg.id, amount: 2, loggedUnit: 'ägg' },
-      { id: 'y_brk_2', date: yesterday, mealType: 'breakfast', ingredientId: swedishIngredients.ragbrod.id, amount: 2, loggedUnit: 'skiva' },
+      { id: 'y_brk_1', date: yesterday, mealType: 'breakfast', ingredientId: swedishIngredients.agg.id, amount: 2, loggedUnit: 'st' },
+      { id: 'y_brk_2', date: yesterday, mealType: 'breakfast', ingredientId: swedishIngredients.ragbrod.id, amount: 2, loggedUnit: 'st' },
       { id: 'y_lch_1', date: yesterday, mealType: 'lunch', ingredientId: swedishIngredients.kyckling.id, amount: 200, loggedUnit: 'g' },
     ]);
 
@@ -160,13 +160,13 @@ describe('Tier 4 — Real-World Application Scenarios: Kaloriräknare Workflows'
   });
 
   it('SCENARIO-04: Editing portion size immediately updates daily caloric and protein aggregates', () => {
-    // Initial: 1 skiva prästost (20g, 76 kcal, 5.2g protein)
-    const initialItem = calculateNutrition(1, 'skiva', swedishIngredients.prastost);
+    // Initial: 1 st prästost (20g, 76 kcal, 5.2g protein)
+    const initialItem = calculateNutrition(1, 'st', swedishIngredients.prastost);
     assert.equal(initialItem.calories, 76);
     assert.equal(initialItem.protein, 5.2);
 
-    // User edits amount to 3 skivor (60g, 228 kcal, 15.6g protein)
-    const updatedItem = calculateNutrition(3, 'skiva', swedishIngredients.prastost);
+    // User edits amount to 3 st (60g, 228 kcal, 15.6g protein)
+    const updatedItem = calculateNutrition(3, 'st', swedishIngredients.prastost);
     assert.equal(updatedItem.calories, 228);
     assert.equal(updatedItem.protein, 15.6);
 

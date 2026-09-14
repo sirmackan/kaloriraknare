@@ -50,7 +50,6 @@ describe('Tier 2 — CALC-01 Boundary: Nutrition Calculation Edge Cases', () => 
     const ingWithoutWeight = {
       ...swedishIngredients.agg,
       pieceWeight: null,
-      pieceLabel: 'st',
     };
 
     const res = calculateNutrition(2, 'st', ingWithoutWeight);
@@ -61,19 +60,17 @@ describe('Tier 2 — CALC-01 Boundary: Nutrition Calculation Edge Cases', () => 
     const ingZeroWeight = {
       ...swedishIngredients.agg,
       pieceWeight: 0,
-      pieceLabel: 'st',
     };
     const resZero = calculateNutrition(2, 'st', ingZeroWeight);
     assert.equal(resZero.effectiveWeight, 2);
   });
 
-  it('CALC-01-B2.6: Custom units containing Swedish characters (å, ä, ö) match case-insensitively', () => {
-    // pieceLabel: "ägg"
-    assert.equal(isPieceUnit('ägg', 'g', 'ägg'), true);
-    assert.equal(isPieceUnit('ÄGG', 'g', 'ägg'), true);
-    assert.equal(isPieceUnit('  Ägg  ', 'g', 'ägg'), true);
-
-    // pieceLabel: "portion" / "smörgås"
-    assert.equal(isPieceUnit('smörgås', 'g', 'smörgås'), true);
+  it('CALC-01-B2.6: Piece unit strictly requires "st" and handles case/whitespace', () => {
+    assert.equal(isPieceUnit('st'), true);
+    assert.equal(isPieceUnit('ST'), true);
+    assert.equal(isPieceUnit('  St  '), true);
+    assert.equal(isPieceUnit('ägg'), false);
+    assert.equal(isPieceUnit('skiva'), false);
+    assert.equal(isPieceUnit('smörgås'), false);
   });
 });

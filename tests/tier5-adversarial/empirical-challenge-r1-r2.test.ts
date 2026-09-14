@@ -85,7 +85,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
         caloriesPer100: 105,
         proteinPer100: 23.1,
         pieceWeight: 150,
-        pieceLabel: 'filé',
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };
@@ -97,7 +96,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
         caloriesPer100: 206,
         proteinPer100: 20,
         pieceWeight: 125,
-        pieceLabel: 'portion',
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };
@@ -109,7 +107,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
         caloriesPer100: 165,
         proteinPer100: 16,
         pieceWeight: 350,
-        pieceLabel: 'portion',
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };
@@ -121,7 +118,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
         caloriesPer100: 370,
         proteinPer100: 13,
         pieceWeight: 40,
-        pieceLabel: 'portion',
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };
@@ -133,7 +129,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
         caloriesPer100: 82,
         proteinPer100: 1.8,
         pieceWeight: 70,
-        pieceLabel: 'potatis',
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };
@@ -155,7 +150,6 @@ describe('Tier 5 — Empirical Challenge: Requirement R1 & Requirement R2', () =
           caloriesPer100: food.cal + (i % 20),
           proteinPer100: food.prot + ((i % 10) / 10),
           pieceWeight: i % 4 === 0 ? 50 + (i % 50) : undefined,
-          pieceLabel: i % 4 === 0 ? 'st' : undefined,
           createdByUserId: 'system',
           createdAt: '2026-01-01T00:00:00Z',
         };

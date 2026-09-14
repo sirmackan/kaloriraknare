@@ -81,7 +81,7 @@ describe('Tier 2 — STATE-02 Boundary: Transactional Rollback & Batch Boundarie
         mealType: 'lunch',
         ingredientId: swedishIngredients.ragbrod.id,
         amount: 1,
-        loggedUnit: 'skiva',
+        loggedUnit: 'st',
       },
     ];
 

@@ -14,7 +14,7 @@ describe('Tier 1 — STATE-02: Atomic Batch Logging in Transaction', () => {
         mealType: 'breakfast',
         ingredientId: swedishIngredients.agg.id,
         amount: 2,
-        loggedUnit: 'ägg',
+        loggedUnit: 'st',
       },
       {
         id: 'meal_b2',
@@ -22,7 +22,7 @@ describe('Tier 1 — STATE-02: Atomic Batch Logging in Transaction', () => {
         mealType: 'breakfast',
         ingredientId: swedishIngredients.ragbrod.id,
         amount: 1,
-        loggedUnit: 'skiva',
+        loggedUnit: 'st',
       },
     ];
 
@@ -142,7 +142,7 @@ describe('Tier 1 — STATE-02: Atomic Batch Logging in Transaction', () => {
         mealType: 'breakfast',
         ingredientId: swedishIngredients.ragbrod.id,
         amount: 2,
-        loggedUnit: 'skiva',
+        loggedUnit: 'st',
       },
     ];
 
@@ -167,7 +167,7 @@ describe('Tier 1 — STATE-02: Atomic Batch Logging in Transaction', () => {
         mealType: 'snack',
         ingredientId: swedishIngredients.protein_skopa.id,
         amount: 1,
-        loggedUnit: 'skopa',
+        loggedUnit: 'st',
       },
     ];
 

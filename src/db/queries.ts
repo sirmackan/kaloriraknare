@@ -173,7 +173,6 @@ export async function createIngredient(data: {
   caloriesPer100: number;
   proteinPer100: number;
   pieceWeight?: number | null;
-  pieceLabel?: string | null;
   createdByUserId: string;
   createdByName?: string;
 }) {
@@ -186,7 +185,6 @@ export async function createIngredient(data: {
       caloriesPer100: data.caloriesPer100 || 0,
       proteinPer100: data.proteinPer100 || 0,
       pieceWeight: data.pieceWeight || null,
-      pieceLabel: data.pieceLabel || null,
       createdByUserId: data.createdByUserId || 'system',
       createdByName: data.createdByName || 'Användare',
     }).returning();
@@ -204,7 +202,6 @@ export async function updateIngredient(id: string, data: {
   caloriesPer100: number;
   proteinPer100: number;
   pieceWeight?: number | null;
-  pieceLabel?: string | null;
 }) {
   try {
     const [updated] = await db.update(ingredients).set({
@@ -214,7 +211,6 @@ export async function updateIngredient(id: string, data: {
       caloriesPer100: data.caloriesPer100,
       proteinPer100: data.proteinPer100,
       pieceWeight: data.pieceWeight || null,
-      pieceLabel: data.pieceLabel || null,
     }).where(eq(ingredients.id, id)).returning();
     return updated;
   } catch (error) {

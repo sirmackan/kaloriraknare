@@ -9,7 +9,7 @@ import { getTableConfig } from 'drizzle-orm/pg-core';
 import * as schema from '../../src/db/schema';
 import type { MealItem, MealType, LoggedUnit, BaseUnit, Ingredient } from '../../src/types';
 import { swedishIngredients } from '../helpers/test-fixtures';
-import { calculateNutrition, formatPieceUnitLabel, getDisplayPieceLabel } from '../../src/utils/nutrition';
+import { calculateNutrition, isPieceUnit } from '../../src/utils/nutrition';
 import { DailySummaryCard } from '../../src/components/DailySummaryCard';
 import { AmountModal } from '../../src/components/AmountModal';
 import { FoodItemRow } from '../../src/components/FoodItemRow';
@@ -536,7 +536,7 @@ describe('Tier 5 — Empirical Challenge: R3 Polish & R4 Quick-Tracking Lifecycl
         mealType: 'lunch',
         ingredientId: swedishIngredients.agg.id,
         amount: 2,
-        loggedUnit: 'ägg',
+        loggedUnit: 'st',
       });
 
       // Quick 1: 350 kcal, 15.2g protein
@@ -688,51 +688,29 @@ describe('Tier 5 — Empirical Challenge: R3 Polish & R4 Quick-Tracking Lifecycl
 
   describe('CHALLENGE-R3: Swedish UI Polish Invariants & Copy Verification', () => {
 
-    it('R3-STRESS-01: Piece label format produces "Antal (skiva)", "Antal (ägg)", "Antal (st)" and handles trims', () => {
-      assert.equal(formatPieceUnitLabel('skiva'), 'Antal (skiva)');
-      assert.equal(formatPieceUnitLabel('ägg'), 'Antal (ägg)');
-      assert.equal(formatPieceUnitLabel('st'), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel('skopa'), 'Antal (skopa)');
-      assert.equal(formatPieceUnitLabel('portion'), 'Antal (portion)');
-      assert.equal(formatPieceUnitLabel('klyfta'), 'Antal (klyfta)');
-
-      // Whitespace and fallback behavior
-      assert.equal(formatPieceUnitLabel(null), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel(undefined), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel(''), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel('   '), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel('  skiva  '), 'Antal (skiva)');
+    it('R3-STRESS-01: Piece unit is strictly "st", non-"st" units are not piece units', () => {
+      assert.equal(isPieceUnit('st'), true);
+      assert.equal(isPieceUnit('ST'), true);
+      assert.equal(isPieceUnit(' st '), true);
+      assert.equal(isPieceUnit('skiva'), false);
+      assert.equal(isPieceUnit('ägg'), false);
+      assert.equal(isPieceUnit('skopa'), false);
+      assert.equal(isPieceUnit('portion'), false);
+      assert.equal(isPieceUnit('klyfta'), false);
+      assert.equal(isPieceUnit(''), false);
+      assert.equal(isPieceUnit('   '), false);
     });
 
-    it('R3-STRESS-02: AmountModal renders formatted piece unit label on button', () => {
-      const htmlSkiva = renderToString(
-        React.createElement(AmountModal, {
-          ingredient: { ...swedishIngredients.prastost, pieceLabel: 'skiva' },
-          onConfirm: () => {},
-          onClose: () => {},
-        })
-      );
-      assert.ok(htmlSkiva.includes('Antal (skiva)'), 'Must render "Antal (skiva)"');
-      assert.ok(!htmlSkiva.includes('Antal skiva'), 'Must not render "Antal skiva"');
-
+    it('R3-STRESS-02: AmountModal renders "Antal st" piece unit button when ingredient has pieceWeight', () => {
       const htmlAgg = renderToString(
         React.createElement(AmountModal, {
-          ingredient: { ...swedishIngredients.agg, pieceLabel: 'ägg' },
+          ingredient: swedishIngredients.agg,
           onConfirm: () => {},
           onClose: () => {},
         })
       );
-      assert.ok(htmlAgg.includes('Antal (ägg)'), 'Must render "Antal (ägg)"');
+      assert.ok(htmlAgg.includes('Antal st'), 'Must render "Antal st"');
       assert.ok(!htmlAgg.includes('Antal ägg'), 'Must not render "Antal ägg"');
-
-      const htmlSt = renderToString(
-        React.createElement(AmountModal, {
-          ingredient: { ...swedishIngredients.agg, pieceLabel: null },
-          onConfirm: () => {},
-          onClose: () => {},
-        })
-      );
-      assert.ok(htmlSt.includes('Antal (st)'), 'Must fallback to "Antal (st)"');
     });
 
     it('R3-STRESS-03: Goal summary asserts that when remainingProtein === 0, "0 g kvar" is NOT displayed', () => {
@@ -938,12 +916,12 @@ describe('Tier 5 — Empirical Challenge: R3 Polish & R4 Quick-Tracking Lifecycl
       assert.ok(!proteinSection.includes('g kvar'));
     });
 
-    it('R3-ADV-03: formatPieceUnitLabel edge cases with exotic whitespace and symbols', () => {
-      assert.equal(formatPieceUnitLabel('\n\t  skiva \r\n '), 'Antal (skiva)');
-      assert.equal(formatPieceUnitLabel('   kopp   '), 'Antal (kopp)');
-      assert.equal(formatPieceUnitLabel('   glas   '), 'Antal (glas)');
-      assert.equal(formatPieceUnitLabel('   burk   '), 'Antal (burk)');
-      assert.equal(formatPieceUnitLabel(''), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel('    '), 'Antal (st)');
+    it('R3-ADV-03: isPieceUnit handles whitespace and case variations for "st" strictly', () => {
+      assert.equal(isPieceUnit('\n\t  st \r\n '), true);
+      assert.equal(isPieceUnit('   st   '), true);
+      assert.equal(isPieceUnit('   ST   '), true);
+      assert.equal(isPieceUnit('   burk   '), false);
+      assert.equal(isPieceUnit(''), false);
+      assert.equal(isPieceUnit('    '), false);
     });
   });

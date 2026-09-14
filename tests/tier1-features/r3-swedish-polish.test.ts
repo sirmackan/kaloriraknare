@@ -4,10 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import {
-  getDisplayPieceLabel,
-  formatPieceUnitLabel,
-} from '../../src/utils/nutrition';
+import { isPieceUnit } from '../../src/utils/nutrition';
 import { AmountModal } from '../../src/components/AmountModal';
 import { DailySummaryCard } from '../../src/components/DailySummaryCard';
 import type { Ingredient } from '../../src/types';
@@ -16,104 +13,35 @@ import { swedishIngredients } from '../helpers/test-fixtures';
 describe('Tier 1 — R3: Swedish UI Phrasing & State Polish', () => {
   const rootDir = process.cwd();
 
-  describe('R3-1: formatPieceUnitLabel Helper & Invariant Verification', () => {
-    it('R3-1.1: Formats custom piece labels with clean parentheses "Antal (<label>)"', () => {
-      assert.equal(formatPieceUnitLabel('skiva'), 'Antal (skiva)');
-      assert.equal(formatPieceUnitLabel('ägg'), 'Antal (ägg)');
-      assert.equal(formatPieceUnitLabel('skopa'), 'Antal (skopa)');
-      assert.equal(formatPieceUnitLabel('portion'), 'Antal (portion)');
-    });
-
-    it('R3-1.2: Formats standard piece unit as "Antal (st)"', () => {
-      assert.equal(formatPieceUnitLabel('st'), 'Antal (st)');
-    });
-
-    it('R3-1.3: Handles null, undefined, empty, and whitespace strings safely falling back to "Antal (st)"', () => {
-      assert.equal(formatPieceUnitLabel(null), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel(undefined), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel(''), 'Antal (st)');
-      assert.equal(formatPieceUnitLabel('   '), 'Antal (st)');
-    });
-
-    it('R3-1.4: Trims extraneous whitespace around custom labels', () => {
-      assert.equal(formatPieceUnitLabel('  skiva  '), 'Antal (skiva)');
-      assert.equal(formatPieceUnitLabel('\tägg\n'), 'Antal (ägg)');
-    });
-
-    it('R3-1.5: Preserves CALC-ADV-07 invariant: getDisplayPieceLabel return behavior is untouched', () => {
-      // Must strictly preserve existing challenger test behavior: returns raw label, not formatted
-      assert.equal(getDisplayPieceLabel('ägg'), 'ägg');
-      assert.equal(getDisplayPieceLabel('  skiva  '), 'skiva');
-      assert.equal(getDisplayPieceLabel(null), 'st');
-      assert.equal(getDisplayPieceLabel(undefined), 'st');
-      assert.equal(getDisplayPieceLabel(''), 'st');
-      assert.equal(getDisplayPieceLabel('   '), 'st');
+  describe('R3-1: Piece Unit Definition', () => {
+    it('R3-1.1: Strictly identifies "st" as piece unit', () => {
+      assert.equal(isPieceUnit('st'), true);
+      assert.equal(isPieceUnit('ST'), true);
+      assert.equal(isPieceUnit('g'), false);
+      assert.equal(isPieceUnit('ml'), false);
     });
   });
 
   describe('R3-2: AmountModal Piece Unit Button Label Rendering', () => {
     const baseIngredient: Ingredient = swedishIngredients.prastost;
 
-    it('R3-2.1: Renders "Antal (skiva)" on piece button when pieceLabel is "skiva"', () => {
+    it('R3-2.1: Renders static "Antal st" on piece button', () => {
       const html = renderToString(
         React.createElement(AmountModal, {
-          ingredient: { ...baseIngredient, pieceLabel: 'skiva' },
+          ingredient: baseIngredient,
           onConfirm: () => {},
           onClose: () => {},
         })
       );
 
       assert.ok(
-        html.includes('Antal (skiva)'),
-        'Piece unit button must format cleanly as "Antal (skiva)" rather than "Antal skiva"'
-      );
-      assert.ok(
-        !html.includes('Antal skiva'),
-        'Piece unit button must NOT be unparenthesized "Antal skiva"'
+        html.includes('Antal st'),
+        'Piece unit button must be hardcoded to "Antal st"'
       );
       assert.ok(
         html.includes('Vikt / Volym') && html.includes('unit-base-btn'),
         'Base unit button should be present'
       );
-    });
-
-    it('R3-2.2: Renders "Antal (ägg)" when pieceLabel is "ägg"', () => {
-      const html = renderToString(
-        React.createElement(AmountModal, {
-          ingredient: { ...baseIngredient, name: 'Ägg', pieceLabel: 'ägg', pieceWeight: 55 },
-          onConfirm: () => {},
-          onClose: () => {},
-        })
-      );
-
-      assert.ok(
-        html.includes('Antal (ägg)'),
-        'Piece unit button must format cleanly as "Antal (ägg)"'
-      );
-      assert.ok(
-        !html.includes('Antal ägg'),
-        'Piece unit button must NOT be unparenthesized "Antal ägg"'
-      );
-    });
-
-    it('R3-2.3: Renders "Antal (st)" when pieceLabel is null, undefined, or empty', () => {
-      const htmlNull = renderToString(
-        React.createElement(AmountModal, {
-          ingredient: { ...baseIngredient, pieceLabel: null },
-          onConfirm: () => {},
-          onClose: () => {},
-        })
-      );
-      assert.ok(htmlNull.includes('Antal (st)'), 'Null pieceLabel should render "Antal (st)"');
-
-      const htmlEmpty = renderToString(
-        React.createElement(AmountModal, {
-          ingredient: { ...baseIngredient, pieceLabel: '' },
-          onConfirm: () => {},
-          onClose: () => {},
-        })
-      );
-      assert.ok(htmlEmpty.includes('Antal (st)'), 'Empty pieceLabel should render "Antal (st)"');
     });
   });
 

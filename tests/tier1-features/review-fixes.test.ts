@@ -36,8 +36,8 @@ describe('Tier 1 — Review Fixes Verification', () => {
 
   it('FIX-5.2: Recipe creation resolves all ingredients via map lookup without N+1 queries', () => {
     const ingredientCatalog = new Map<string, Ingredient>([
-      ['ing_egg', { id: 'ing_egg', name: 'Ägg', unit: 'g', caloriesPer100: 143, proteinPer100: 12.6, pieceWeight: 55, pieceLabel: 'ägg', createdByUserId: 'system', createdAt: '' }],
-      ['ing_bread', { id: 'ing_bread', name: 'Rågbröd', unit: 'g', caloriesPer100: 220, proteinPer100: 8.5, pieceWeight: 40, pieceLabel: 'skiva', createdByUserId: 'system', createdAt: '' }],
+      ['ing_egg', { id: 'ing_egg', name: 'Ägg', unit: 'g', caloriesPer100: 143, proteinPer100: 12.6, pieceWeight: 55, createdByUserId: 'system', createdAt: '' }],
+      ['ing_bread', { id: 'ing_bread', name: 'Rågbröd', unit: 'g', caloriesPer100: 220, proteinPer100: 8.5, pieceWeight: 40, createdByUserId: 'system', createdAt: '' }],
     ]);
 
     const recipeItemsInput = [

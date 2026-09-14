@@ -59,7 +59,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'breakfast',
         ingredientId: swedishIngredients.agg.id,
         amount: 2,
-        loggedUnit: 'ägg',
+        loggedUnit: 'st',
       },
       {
         id: 'cross_meal_2',
@@ -67,7 +67,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'breakfast',
         ingredientId: swedishIngredients.ragbrod.id,
         amount: 2,
-        loggedUnit: 'skiva',
+        loggedUnit: 'st',
       },
     ];
 
@@ -120,7 +120,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
       ingredientId: swedishIngredients.agg.id,
       ingredientName: swedishIngredients.agg.name,
       amount: 2,
-      loggedUnit: 'ägg' as any,
+      loggedUnit: 'st',
       baseUnit: 'g',
       pieceWeight: 55,
       calories: 157,
@@ -138,7 +138,6 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
       unit: originalIng.unit,
       baseUnit: originalIng.unit,
       pieceWeight: originalIng.pieceWeight,
-      pieceLabel: originalIng.pieceLabel,
       caloriesPer100: originalIng.caloriesPer100, // exact 143, NOT approximated
       proteinPer100: originalIng.proteinPer100,   // exact 12.6
     };
@@ -147,7 +146,6 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
     const calc = calculateNutrition(recipeItem.amount, recipeItem.loggedUnit, recipeItem);
     assert.equal(calc.calories, 157);
     assert.equal(calc.protein, 13.9);
-    assert.equal(recipeItem.pieceLabel, 'ägg');
     assert.equal(recipeItem.caloriesPer100, 143);
   });
 
@@ -158,9 +156,9 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
 
     assert.equal(numericAmount, 1.5);
 
-    // 1.5 portioner havregryn (pieceWeight 40g, 370 kcal/100g, 13g protein/100g)
+    // 1.5 st havregryn (pieceWeight 40g, 370 kcal/100g, 13g protein/100g)
     // 1.5 * 40 = 60g -> (60 / 100) * 370 = 222 kcal, (60 / 100) * 13 = 7.8g protein
-    const result = calculateNutrition(numericAmount, 'portion', swedishIngredients.havregryn);
+    const result = calculateNutrition(numericAmount, 'st', swedishIngredients.havregryn);
     assert.equal(result.effectiveWeight, 60);
     assert.equal(result.calories, 222);
     assert.equal(result.protein, 7.8);
@@ -184,7 +182,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'dinner',
         ingredientId: swedishIngredients.prastost.id,
         amount: 2,
-        loggedUnit: 'skiva', // custom piece unit
+        loggedUnit: 'st', // piece unit
       },
       {
         id: 'mix_3_fail',
@@ -213,14 +211,14 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         {
           ingredientId: swedishIngredients.agg.id,
           amount: 2,
-          loggedUnit: 'ägg',
+          loggedUnit: 'st',
           calories: 157,
           protein: 13.9,
         },
         {
           ingredientId: swedishIngredients.ragbrod.id,
           amount: 2,
-          loggedUnit: 'skiva',
+          loggedUnit: 'st',
           calories: 176,
           protein: 5.6,
         },
@@ -279,7 +277,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'snack',
         ingredientId: swedishIngredients.agg.id,
         amount: sanitizedAmount1,
-        loggedUnit: 'ägg',
+        loggedUnit: 'st',
       },
       {
         id: 'dec_meal_2',
@@ -296,15 +294,14 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
     assert.equal(results[1].amount, 100.5);
   });
 
-  it('CROSS-09: (CALC-01 + DB-JSONB) Storing recipe with pieceLabel and pieceWeight in JSONB preserves full fidelity', () => {
+  it('CROSS-09: (CALC-01 + DB-JSONB) Storing recipe with pieceWeight in JSONB preserves full fidelity', () => {
     const recipeItem = {
       ingredientId: swedishIngredients.prastost.id,
       ingredientName: swedishIngredients.prastost.name,
       amount: 3,
-      loggedUnit: 'skiva',
+      loggedUnit: 'st',
       baseUnit: 'g',
       pieceWeight: 20,
-      pieceLabel: 'skiva',
       calories: 228,
       protein: 15.6,
     };
@@ -312,7 +309,6 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
     const serialized = JSON.stringify(recipeItem);
     const parsed = JSON.parse(serialized);
 
-    assert.equal(parsed.pieceLabel, 'skiva');
     assert.equal(parsed.pieceWeight, 20);
     assert.equal(parsed.calories, 228);
   });
@@ -328,7 +324,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'breakfast' as const,
         ingredientId: swedishIngredients.agg.id,
         amount: 2,
-        loggedUnit: 'ägg',
+        loggedUnit: 'st',
       },
       {
         id: 'copy_2',
@@ -336,7 +332,7 @@ describe('Tier 3 — Cross-Feature Combinations & Pairwise Interactions', () => 
         mealType: 'breakfast' as const,
         ingredientId: swedishIngredients.ragbrod.id,
         amount: 1,
-        loggedUnit: 'skiva',
+        loggedUnit: 'st',
       },
     ];
 

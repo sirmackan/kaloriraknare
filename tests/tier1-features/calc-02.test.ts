@@ -43,7 +43,6 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
         loggedUnit: item.loggedUnit,
         baseUnit: original.unit,
         pieceWeight: original.pieceWeight || null,
-        pieceLabel: original.pieceLabel || null,
         caloriesPer100: original.caloriesPer100,
         proteinPer100: original.proteinPer100,
       });
@@ -61,7 +60,7 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
       ingredientId: swedishIngredients.agg.id,
       ingredientName: swedishIngredients.agg.name,
       amount: 2,
-      loggedUnit: 'ägg' as any,
+      loggedUnit: 'st',
       baseUnit: 'g',
       pieceWeight: 55,
       calories: 157,
@@ -76,7 +75,6 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
     const item = recipeItems[0];
     assert.equal(item.caloriesPer100, 143, 'Must match exact ingredient record (143 kcal/100g)');
     assert.equal(item.proteinPer100, 12.6, 'Must match exact ingredient record (12.6g protein/100g)');
-    assert.equal(item.pieceLabel, 'ägg', 'Must preserve pieceLabel from ingredient record');
   });
 
   it('CALC-02-T1.2: Prevents the +17.6% rounding inflation caused by back-calculation on small portions', async () => {
@@ -132,7 +130,7 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
     assert.equal(recipeItems[0].caloriesPer100, 34, 'Must retain original 34 kcal/100g, not 0 kcal/100g');
   });
 
-  it('CALC-02-T1.4: Preserves complete ingredient metadata (pieceLabel, pieceWeight, baseUnit)', async () => {
+  it('CALC-02-T1.4: Preserves complete ingredient metadata (pieceWeight, baseUnit)', async () => {
     const mealItem: MealItem = {
       id: 'meal_ost',
       userId: 'usr_1',
@@ -141,7 +139,7 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
       ingredientId: swedishIngredients.prastost.id,
       ingredientName: swedishIngredients.prastost.name,
       amount: 3,
-      loggedUnit: 'skiva' as any,
+      loggedUnit: 'st',
       baseUnit: 'g',
       pieceWeight: 20,
       calories: 228,
@@ -152,7 +150,6 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
     const lookup = async (id: string) => mockIngredientDatabase.get(id) || null;
     const [recipeItem] = await resolveMealToRecipeItems([mealItem], lookup);
 
-    assert.equal(recipeItem.pieceLabel, 'skiva');
     assert.equal(recipeItem.pieceWeight, 20);
     assert.equal(recipeItem.baseUnit, 'g');
     assert.equal(recipeItem.ingredientId, swedishIngredients.prastost.id);
@@ -182,7 +179,7 @@ describe('Tier 1 — CALC-02: Zero Back-Calculation in Recipe Creation', () => {
         ingredientId: swedishIngredients.ragbrod.id,
         ingredientName: swedishIngredients.ragbrod.name,
         amount: 1,
-        loggedUnit: 'skiva' as any,
+        loggedUnit: 'st',
         baseUnit: 'g',
         calories: 88,
         protein: 2.8,

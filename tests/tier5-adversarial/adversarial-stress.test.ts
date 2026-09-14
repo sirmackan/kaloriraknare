@@ -433,7 +433,7 @@ describe('Tier 5 — Adversarial Hardening & Empirical Stress Verification', () 
           ingredientId: 'ing_ragbrod',
           ingredientName: 'Mörkt surdegsrågbröd',
           amount: 2,
-          loggedUnit: 'skiva' as any,
+          loggedUnit: 'st',
           baseUnit: 'g',
           pieceWeight: 40,
           calories: 176,
@@ -443,7 +443,7 @@ describe('Tier 5 — Adversarial Hardening & Empirical Stress Verification', () 
           ingredientId: 'ing_prastost',
           ingredientName: 'Prästost 31%',
           amount: 2,
-          loggedUnit: 'skiva' as any,
+          loggedUnit: 'st',
           baseUnit: 'g',
           pieceWeight: 20,
           calories: 152,
@@ -456,7 +456,7 @@ describe('Tier 5 — Adversarial Hardening & Empirical Stress Verification', () 
       assert.equal(testRecipeItems.length, 2);
       assert.equal(testRecipeItems[0].ingredientName, 'Mörkt surdegsrågbröd');
       assert.equal(testRecipeItems[1].ingredientName, 'Prästost 31%');
-      assert.equal(testRecipeItems[0].loggedUnit, 'skiva');
+      assert.equal(testRecipeItems[0].loggedUnit, 'st');
     });
   });
 

@@ -149,7 +149,6 @@ export function useCreateIngredientMutation() {
       caloriesPer100: number;
       proteinPer100: number;
       pieceWeight?: number | null;
-      pieceLabel?: string | null;
     }) => api.createIngredient(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
@@ -173,7 +172,6 @@ export function useUpdateIngredientMutation() {
         caloriesPer100: number;
         proteinPer100: number;
         pieceWeight?: number | null;
-        pieceLabel?: string | null;
       };
     }) => api.updateIngredient(id, data),
     onSuccess: () => {

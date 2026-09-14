@@ -348,7 +348,6 @@ function AppContent() {
     caloriesPer100: number;
     proteinPer100: number;
     pieceWeight?: number | null;
-    pieceLabel?: string | null;
   }) => {
     try {
       if (activeModal?.type === 'ingredient' && activeModal.editingIngredient) {

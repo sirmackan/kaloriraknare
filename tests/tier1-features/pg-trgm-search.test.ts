@@ -23,7 +23,6 @@ describe('Tier 1 — pg_trgm Word-Similarity Search & Relevance Ordering', () =>
         caloriesPer100: item.caloriesPer100 ?? 150,
         proteinPer100: item.proteinPer100 ?? 10,
         pieceWeight: item.pieceWeight,
-        pieceLabel: item.pieceLabel,
         createdByUserId: 'system',
         createdAt: '2026-01-01T00:00:00Z',
       };

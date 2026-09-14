@@ -10,7 +10,7 @@ interface MealCardProps {
   onOpenAdd: (mealType: MealType) => void;
   onCopyYesterday: (mealType: MealType) => void;
   onEditItem: (item: MealItem) => void;
-  onDeleteItem: (id: string) => void;
+  onDeleteItem: (item: MealItem) => void;
   onSaveAsRecipe: (mealType: MealType, items: MealItem[]) => void;
   isCopyingYesterday?: boolean;
 }
@@ -98,7 +98,7 @@ export const MealCard: React.FC<MealCardProps> = ({
               calories={item.calories}
               protein={item.protein}
               onEdit={() => onEditItem(item)}
-              onDelete={() => onDeleteItem(item.id)}
+              onDelete={() => onDeleteItem(item)}
             />
           ))}
 

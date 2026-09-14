@@ -171,11 +171,10 @@ export const api = {
     pieceLabel?: string | null;
   }): Promise<Ingredient> {
     const headers = await getHeaders();
-    const id = 'ing_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
     const res = await fetch('/api/ingredients', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ...data, id }),
+      body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Kunde inte skapa råvara');
     return res.json();
@@ -233,11 +232,10 @@ export const api = {
     loggedUnit: LoggedUnit;
   }): Promise<MealItem> {
     const headers = await getHeaders();
-    const id = 'meal_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
     const res = await fetch('/api/meals', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ...item, id }),
+      body: JSON.stringify(item),
     });
     if (!res.ok) throw new Error('Kunde inte logga måltid');
     return res.json();
@@ -251,14 +249,10 @@ export const api = {
     loggedUnit: LoggedUnit;
   }[]): Promise<MealItem[]> {
     const headers = await getHeaders();
-    const payload = items.map((i) => ({
-      ...i,
-      id: 'meal_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36),
-    }));
     const res = await fetch('/api/meals/batch', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ items: payload }),
+      body: JSON.stringify({ items }),
     });
     if (!res.ok) throw new Error('Kunde inte batch-logga måltider');
     return res.json();
@@ -326,11 +320,10 @@ export const api = {
     items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[]
   ): Promise<Recipe> {
     const headers = await getHeaders();
-    const id = 'rec_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
     const res = await fetch('/api/recipes', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ id, name, items }),
+      body: JSON.stringify({ name, items }),
     });
     if (!res.ok) throw new Error('Kunde inte skapa recept');
     return res.json();

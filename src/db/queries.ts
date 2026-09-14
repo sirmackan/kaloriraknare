@@ -89,10 +89,15 @@ export async function getRecentIngredients(userId: string) {
     const uniqueIds = Array.from(new Set(recentMeals.map((m) => m.ingredientId))).slice(0, 20);
     if (uniqueIds.length === 0) return [];
 
-    return await db
+    const rows = await db
       .select()
       .from(ingredients)
       .where(and(inArray(ingredients.id, uniqueIds), eq(ingredients.isDeleted, false)));
+
+    const ingMap = new Map(rows.map((ing) => [ing.id, ing]));
+    return uniqueIds
+      .map((id) => ingMap.get(id))
+      .filter((ing): ing is (typeof rows)[0] => Boolean(ing));
   } catch (error) {
     console.error('Failed to fetch recent ingredients:', error);
     throw new Error('Failed to fetch recent ingredients', { cause: error });
@@ -114,7 +119,7 @@ export async function deleteIngredient(id: string) {
 }
 
 export async function createIngredient(data: {
-  id: string;
+  id?: string;
   name: string;
   barcode?: string;
   unit: BaseUnit;
@@ -127,7 +132,7 @@ export async function createIngredient(data: {
 }) {
   try {
     const [inserted] = await db.insert(ingredients).values({
-      id: data.id,
+      id: data.id || ('ing_' + crypto.randomUUID()),
       name: data.name.trim(),
       barcode: data.barcode?.trim() || null,
       unit: data.unit || 'g',
@@ -182,7 +187,7 @@ export async function getMealsByDate(userId: string, date: string) {
 }
 
 export async function addMealItem(userId: string, item: {
-  id: string;
+  id?: string;
   date: string;
   mealType: MealType;
   ingredientId: string;
@@ -198,7 +203,7 @@ export async function addMealItem(userId: string, item: {
     const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
 
     const [created] = await db.insert(meals).values({
-      id: item.id,
+      id: item.id || ('meal_' + crypto.randomUUID()),
       userId,
       date: item.date,
       mealType: item.mealType,
@@ -220,7 +225,7 @@ export async function addMealItem(userId: string, item: {
 }
 
 export async function addBatchMeals(userId: string, items: {
-  id: string;
+  id?: string;
   date: string;
   mealType: MealType;
   ingredientId: string;
@@ -256,7 +261,7 @@ export async function addBatchMeals(userId: string, items: {
         const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
 
         return {
-          id: item.id,
+          id: item.id || ('meal_' + crypto.randomUUID()),
           userId,
           date: item.date,
           mealType: item.mealType,
@@ -339,14 +344,26 @@ export async function getRecipes(userId: string) {
   }
 }
 
-export async function createRecipe(userId: string, id: string, name: string, items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[]) {
+export async function createRecipe(
+  userId: string,
+  id: string | undefined,
+  name: string,
+  items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[]
+) {
   try {
+    const recipeId = id || ('rec_' + crypto.randomUUID());
+    const uniqueIds = Array.from(new Set(items.map((i) => i.ingredientId)));
+    const ingRecords = uniqueIds.length > 0
+      ? await db.select().from(ingredients).where(inArray(ingredients.id, uniqueIds))
+      : [];
+    const ingMap = new Map(ingRecords.map((ing) => [ing.id, ing]));
+
     const recipeItems: RecipeItem[] = [];
     let totalCalories = 0;
     let totalProtein = 0;
 
     for (const item of items) {
-      const ing = await getIngredientById(item.ingredientId);
+      const ing = ingMap.get(item.ingredientId);
       if (!ing) continue;
 
       const { calories, protein } = calculateNutrition(item.amount, item.loggedUnit, ing);
@@ -367,7 +384,7 @@ export async function createRecipe(userId: string, id: string, name: string, ite
     }
 
     const [created] = await db.insert(recipes).values({
-      id,
+      id: recipeId,
       userId,
       name: name.trim(),
       items: recipeItems,

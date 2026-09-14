@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, Flame, Dumbbell } from 'lucide-react';
 import type { Ingredient, LoggedUnit, MealType } from '../types';
-import { MEAL_LABELS } from '../types';
+import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { calculateNutrition, getDisplayPieceLabel } from '../utils/nutrition';
 
 interface AmountModalProps {
@@ -27,7 +27,9 @@ export const AmountModal: React.FC<AmountModalProps> = ({
   onConfirm,
   onClose,
 }) => {
-  const categoryLabel = mealType ? MEAL_LABELS[mealType].toLowerCase() : (customCategoryLabel || 'recept');
+  const categoryLabel = mealType
+    ? MEAL_DEFINITE_LABELS[mealType]
+    : (customCategoryLabel === 'recept' ? 'receptet' : (customCategoryLabel || 'receptet'));
   const hasPiece = Boolean(ingredient.pieceWeight && ingredient.pieceWeight > 0);
   const defaultUnit: LoggedUnit = initialUnit || (hasPiece ? 'st' : ingredient.unit);
   const [unit, setUnit] = useState<LoggedUnit>(defaultUnit);
@@ -153,32 +155,55 @@ export const AmountModal: React.FC<AmountModalProps> = ({
           )}
 
           {/* Amount input */}
-          <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-colors">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mängd</span>
-            <div className="flex items-baseline gap-1.5">
-              <input
-                id="amount-input"
-                name="entry_amount"
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                data-form-type="other"
-                data-lpignore="true"
-                data-1p-ignore="true"
-                value={amount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(',', '.');
-                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                    setAmount(val);
-                  }
-                }}
-                className="w-28 text-right bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono"
-              />
-              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                {unit}
-              </span>
+          <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5 transition-colors">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mängd</span>
+              <div className="flex items-baseline gap-1.5">
+                <input
+                  id="amount-input"
+                  name="entry_amount"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  value={amount}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(',', '.');
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setAmount(val);
+                    }
+                  }}
+                  className="w-28 text-right bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono"
+                />
+                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  {unit}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Adjustment Pills */}
+            <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 mr-auto font-medium">Snabbval:</span>
+              {(unit === 'st' ? [0.5, 1, 2] : [10, 50, 100]).map((inc) => (
+                <button
+                  key={inc}
+                  type="button"
+                  id={`quick-inc-${inc}-btn`}
+                  onClick={() => {
+                    const current = parseFloat(amount.replace(',', '.')) || 0;
+                    const next = Math.round((current + inc) * 10) / 10;
+                    setAmount(String(next));
+                  }}
+                  className="px-2 py-0.5 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition touch-manipulation shadow-2xs"
+                >
+                  +{inc} {unit === 'st' ? '' : unit}
+                </button>
+              ))}
             </div>
           </div>
 

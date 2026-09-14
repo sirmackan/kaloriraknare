@@ -129,7 +129,7 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
                   : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
-              1 vecka sedan
+              En vecka sedan
             </button>
           </div>
 

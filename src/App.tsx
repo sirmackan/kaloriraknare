@@ -11,6 +11,7 @@ import { IngredientModal } from './components/IngredientModal';
 import { RecipeModal } from './components/RecipeModal';
 import { ProfileModal } from './components/ProfileModal';
 import { CopyYesterdayModal } from './components/CopyYesterdayModal';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { GoogleSignInScreen } from './components/GoogleSignInScreen';
 import { getTodayString, addDays } from './utils/date';
 import { api } from './services/api';
@@ -104,6 +105,7 @@ function AppContent() {
   // Modals state
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [copyingMeal, setCopyingMeal] = useState<MealType | null>(null);
+  const [mealItemToDelete, setMealItemToDelete] = useState<MealItem | null>(null);
 
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -219,9 +221,15 @@ function AppContent() {
   };
 
   // Delete logged item
-  const handleDeleteItem = async (id: string) => {
+  const handleDeleteItem = (item: MealItem) => {
+    setMealItemToDelete(item);
+  };
+
+  const handleConfirmDeleteMealItem = async () => {
+    if (!mealItemToDelete) return;
     try {
-      await deleteMealMutation.mutateAsync({ id, date: currentDate });
+      await deleteMealMutation.mutateAsync({ id: mealItemToDelete.id, date: currentDate });
+      setMealItemToDelete(null);
     } catch (err: any) {
       showErrorToast(err.message || 'Kunde inte radera måltidsrad');
     }
@@ -524,6 +532,23 @@ function AppContent() {
         {activeModal?.type === 'profile' && (
           <ProfileModal onClose={() => setActiveModal(null)} />
         )}
+
+        {/* Confirm Delete Meal Item Modal */}
+        <ConfirmDeleteModal
+          isOpen={Boolean(mealItemToDelete)}
+          title="Ta bort måltidsrad"
+          itemName={mealItemToDelete?.ingredientName}
+          description={
+            mealItemToDelete
+              ? `Vill du ta bort ${mealItemToDelete.amount} ${mealItemToDelete.loggedUnit} "${mealItemToDelete.ingredientName}" (${mealItemToDelete.calories} kcal) från måltiden?`
+              : undefined
+          }
+          isDeleting={deleteMealMutation.isPending}
+          onConfirm={handleConfirmDeleteMealItem}
+          onClose={() => {
+            if (!deleteMealMutation.isPending) setMealItemToDelete(null);
+          }}
+        />
 
         {/* Global Error-Only Toast */}
         {errorToast && (

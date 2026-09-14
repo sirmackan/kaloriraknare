@@ -263,7 +263,7 @@ export const LogModal: React.FC<LogModalProps> = ({
                 {recentIngredients.length === 0 ? (
                   <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center space-y-2">
                     <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Du har inga senast använda råvaror än.
+                      Du har inga tidigare använda råvaror än.
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       Sök i fältet ovan eller skanna en streckkod för att logga matvaror.

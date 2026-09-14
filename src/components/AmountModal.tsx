@@ -92,7 +92,15 @@ export const AmountModal: React.FC<AmountModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto">
+    <div
+      id="amount-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto"
+    >
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="amount-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] flex flex-col my-auto animate-in fade-in duration-200 transition-colors">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -158,7 +166,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
           )}
 
           {/* Amount input */}
-          <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5 transition-colors">
+          <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 transition-colors">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mängd</span>
               <div className="flex items-baseline gap-1.5">
@@ -187,26 +195,6 @@ export const AmountModal: React.FC<AmountModalProps> = ({
                   {unit}
                 </span>
               </div>
-            </div>
-
-            {/* Quick Adjustment Pills */}
-            <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 mr-auto font-medium">Snabbval:</span>
-              {(unit === 'st' ? [0.5, 1, 2] : [10, 50, 100]).map((inc) => (
-                <button
-                  key={inc}
-                  type="button"
-                  id={`quick-inc-${inc}-btn`}
-                  onClick={() => {
-                    const current = parseFloat(amount.replace(',', '.')) || 0;
-                    const next = Math.round((current + inc) * 10) / 10;
-                    setAmount(String(next));
-                  }}
-                  className="px-2 py-0.5 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 transition touch-manipulation shadow-2xs"
-                >
-                  +{inc} {unit === 'st' ? '' : unit}
-                </button>
-              ))}
             </div>
           </div>
 

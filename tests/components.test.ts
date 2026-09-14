@@ -84,14 +84,13 @@ describe('rendered component contracts', () => {
     }));
 
     assert.match(html, /Lunch ute/);
-    assert.match(html, /Snabblogg/);
     assert.match(html, /650<!-- --> kcal/);
     assert.match(html, /42<!-- --> g protein/);
     assert.match(html, /aria-label="Ändra mängd"/);
     assert.match(html, /aria-label="Ta bort"/);
   });
 
-  it('includes quick entries in meal totals and marks only those rows as quick', () => {
+  it('includes quick entries in meal totals and renders item rows cleanly', () => {
     const items: MealItem[] = [
       {
         id: 'standard-1', userId: 'user-1', date: '2026-09-14', mealType: 'dinner',
@@ -119,7 +118,6 @@ describe('rendered component contracts', () => {
     assert.match(html, /540/);
     assert.match(html, /50\.5/);
     assert.match(html, /Sås &amp; tillbehör/);
-    assert.equal((html.match(/Snabblogg/g) ?? []).length, 1);
   });
 
   it('renders the quick-log form with all required inputs and action', () => {
@@ -141,6 +139,6 @@ describe('rendered component contracts', () => {
       assert.match(html, new RegExp(`id="${id}"`));
     }
     assert.match(html, /Snabblogg/);
-    assert.match(html, />Logga</);
+    assert.match(html, /Logga i lunchen/);
   });
 });

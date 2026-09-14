@@ -113,11 +113,11 @@ export const MealCard: React.FC<MealCardProps> = ({
           ))}
 
           {/* Quick footer to save whole meal as recipe */}
-          <div className="px-3.5 py-2 bg-slate-50/70 dark:bg-slate-900/60 flex justify-end transition-colors">
+          <div className="px-3 py-1 bg-slate-50/70 dark:bg-slate-900/60 flex justify-end transition-colors border-t border-slate-100/60 dark:border-slate-800/40">
             <button
               id={`save-meal-recipe-${mealType}-btn`}
               onClick={() => onSaveAsRecipe(mealType, items)}
-              className="flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+              className="inline-flex items-center gap-1 py-0.5 px-1 rounded text-[10.5px] font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition cursor-pointer active:scale-95 leading-tight"
             >
               <BookmarkPlus className="w-3 h-3" />
               <span>Spara måltid som recept</span>

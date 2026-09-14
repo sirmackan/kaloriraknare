@@ -67,7 +67,15 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
   const isSelectedYesterday = selectedDate === yesterdayDate;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
+    <div
+      id="copy-yesterday-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && copyingSource === null) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
+    >
       <div
         ref={dialogRef}
         role="dialog"

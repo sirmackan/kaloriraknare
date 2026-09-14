@@ -9,8 +9,47 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-let openDialogs = 0;
+interface DialogEntry {
+  id: number;
+  onClose: () => void;
+  isPrevented: () => boolean;
+}
+
+let nextDialogId = 1;
+const dialogStack: DialogEntry[] = [];
 let originalOverflow = '';
+let isInternalHistoryPop = false;
+let isPopStateListenerAttached = false;
+let cleanupHistoryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function handleGlobalPopState() {
+  if (isInternalHistoryPop) {
+    isInternalHistoryPop = false;
+    return;
+  }
+
+  if (dialogStack.length === 0) return;
+
+  const topDialog = dialogStack[dialogStack.length - 1];
+  if (topDialog.isPrevented()) {
+    try {
+      window.history.pushState({ dialogLevel: 1 }, '');
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  // Close the active top dialog
+  topDialog.onClose();
+}
+
+function ensurePopStateListener() {
+  if (!isPopStateListenerAttached && typeof window !== 'undefined') {
+    window.addEventListener('popstate', handleGlobalPopState);
+    isPopStateListenerAttached = true;
+  }
+}
 
 export function useDialogAccessibility(onClose: () => void, preventClose = false, active = true) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -21,12 +60,32 @@ export function useDialogAccessibility(onClose: () => void, preventClose = false
 
   useEffect(() => {
     if (!active) return;
+
+    ensurePopStateListener();
+
+    if (cleanupHistoryTimeout) {
+      clearTimeout(cleanupHistoryTimeout);
+      cleanupHistoryTimeout = null;
+    }
+
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (openDialogs === 0) {
+    if (dialogStack.length === 0) {
       originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+
+      try {
+        window.history.pushState({ dialogLevel: 1 }, '');
+      } catch {
+        // ignore
+      }
     }
-    openDialogs += 1;
+
+    const entryId = nextDialogId++;
+    dialogStack.push({
+      id: entryId,
+      onClose: () => onCloseRef.current(),
+      isPrevented: () => preventCloseRef.current,
+    });
 
     const dialog = dialogRef.current;
     const frame = requestAnimationFrame(() => {
@@ -64,11 +123,31 @@ export function useDialogAccessibility(onClose: () => void, preventClose = false
     return () => {
       cancelAnimationFrame(frame);
       document.removeEventListener('keydown', handleKeyDown);
-      openDialogs = Math.max(0, openDialogs - 1);
-      if (openDialogs === 0) document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
+
+      const index = dialogStack.findIndex((d) => d.id === entryId);
+      if (index !== -1) {
+        dialogStack.splice(index, 1);
+      }
+
+      if (dialogStack.length === 0) {
+        document.body.style.overflow = originalOverflow;
+        previouslyFocused?.focus();
+
+        // Defer history.back() slightly to avoid colliding with another modal mounting in the same transition
+        cleanupHistoryTimeout = setTimeout(() => {
+          if (dialogStack.length === 0 && typeof window !== 'undefined' && window.history.state?.dialogLevel) {
+            isInternalHistoryPop = true;
+            try {
+              window.history.back();
+            } catch {
+              isInternalHistoryPop = false;
+            }
+          }
+        }, 30);
+      }
     };
   }, [active]);
 
   return dialogRef;
 }
+

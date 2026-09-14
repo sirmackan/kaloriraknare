@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap } from 'lucide-react';
+import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap, Check } from 'lucide-react';
 import type { Ingredient, MealType, Recipe, MealItem } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { api } from '../services/api';
@@ -122,7 +122,15 @@ export const LogModal: React.FC<LogModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
+    <div
+      id="log-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmittingQuick && loggingRecipeId === null) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto"
+    >
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="log-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-150 transition-colors">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
@@ -576,15 +584,18 @@ export const LogModal: React.FC<LogModalProps> = ({
                 type="submit"
                 id="submit-quick-log-btn"
                 disabled={isSubmittingQuick || (!quickCalories && !quickProtein)}
-                className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl transition active:scale-98 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 cursor-pointer touch-manipulation"
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-98 disabled:opacity-50 text-slate-950 text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
               >
                 {isSubmittingQuick ? (
                   <>
                     <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                    <span>Sparar...</span>
+                    <span>{editingQuickItem ? 'Sparar ändring...' : `Loggar i ${MEAL_DEFINITE_LABELS[mealType]}...`}</span>
                   </>
                 ) : (
-                  <span>Logga</span>
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>{editingQuickItem ? 'Spara ändring' : `Logga i ${MEAL_DEFINITE_LABELS[mealType]}`}</span>
+                  </>
                 )}
               </button>
             </div>

@@ -23,8 +23,10 @@ function pushHistory(historyId: number) {
       ...(window.history.state ?? {}),
       [historyKey]: historyId,
     }, '');
+    return true;
   } catch {
     // History can be unavailable in embedded/private browsing contexts.
+    return false;
   }
 }
 
@@ -66,7 +68,11 @@ function handlePopState() {
     return;
   }
 
-  dialog.historyConsumed = true;
+  // Re-arm the guard before React changes which dialog is rendered. In Android
+  // PWAs a second hardware-back press can otherwise leave the app while the
+  // replacement dialog is still mounting. If another dialog opens, it reuses
+  // this entry; if none does, unregisterDialogHistory removes it shortly after.
+  dialog.historyConsumed = !pushHistory(dialog.historyId);
   dialog.onClose();
 }
 

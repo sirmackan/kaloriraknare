@@ -34,4 +34,4 @@ The public `GET /api/health` route is a process liveness check. `GET /api/ready`
 
 The API intentionally has no compatibility layer for the earlier loose meal payloads. Meal requests must use the explicit `kind: "ingredient"` or `kind: "quick"` contracts in `src/validation.ts`.
 
-The first migration clears unsupported barcode values and clears later duplicates before adding the active-barcode uniqueness constraint. Ingredient records themselves are retained.
+The first migration upgrades the historical schema in place: it converts text recipe JSON to `jsonb`, makes meal ingredient references nullable for quick logs, and adds soft-delete state when absent. It also clears unsupported barcode values and later duplicate barcodes before adding the active-barcode uniqueness constraint. Existing meal and ingredient records are retained.

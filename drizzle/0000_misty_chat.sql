@@ -54,6 +54,15 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "ingredients" ADD COLUMN IF NOT EXISTS "is_deleted" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "meals" ALTER COLUMN "ingredient_id" DROP NOT NULL;--> statement-breakpoint
+UPDATE "recipes" SET "items_json" = '[]' WHERE "items_json" IS NULL OR btrim("items_json"::text) = '';--> statement-breakpoint
+ALTER TABLE "recipes" ALTER COLUMN "items_json" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE "recipes"
+ ALTER COLUMN "items_json" TYPE jsonb
+ USING ("items_json"::text)::jsonb;--> statement-breakpoint
+ALTER TABLE "recipes" ALTER COLUMN "items_json" SET DEFAULT '[]'::jsonb;--> statement-breakpoint
+ALTER TABLE "recipes" ALTER COLUMN "items_json" SET NOT NULL;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "meals" ADD CONSTRAINT "meals_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint

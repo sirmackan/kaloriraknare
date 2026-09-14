@@ -1,407 +1,153 @@
-import {
-  auth,
-  googleProvider,
-} from './firebase';
-import {
-  signInWithPopup,
-  signOut as fbSignOut,
-} from 'firebase/auth';
-import type { User, Ingredient, MealItem, Recipe, MealType, LoggedUnit, BaseUnit } from '../types';
+import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import { auth, googleProvider } from './firebase';
+import type { Ingredient, MealItem, Recipe, User } from '../types';
+import type { CopyMealInput, IngredientInput, LogRecipeInput, MealInput, MealUpdate, RecipeInput } from '../validation';
 
-async function getHeaders(): Promise<HeadersInit> {
-  const currentUser = auth.currentUser;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (currentUser) {
-    try {
-      const idToken = await currentUser.getIdToken();
-      headers['Authorization'] = `Bearer ${idToken}`;
-    } catch (e) {
-      console.error('Failed to get Firebase ID token:', e);
-    }
+type FirebaseUserLike = {
+  uid: string;
+  getIdToken?: () => Promise<string>;
+};
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
   }
-  return headers;
+}
+
+async function authenticatedHeaders(): Promise<HeadersInit> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new ApiError('Du är inte längre inloggad', 401);
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${await currentUser.getIdToken()}`,
+  };
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, { ...init, headers: await authenticatedHeaders() });
+  if (!response.ok) {
+    let message = 'Något gick fel';
+    try {
+      const payload = await response.json() as { error?: string };
+      if (payload.error) message = payload.error;
+    } catch {
+      // A non-JSON proxy response should still surface as a useful request error.
+    }
+    throw new ApiError(message, response.status);
+  }
+  return response.json() as Promise<T>;
+}
+
+function normalizeUser(user: User): User {
+  return { ...user, createdAt: new Date(user.createdAt).toISOString(), goalsConfigured: user.goalsConfigured };
 }
 
 const syncPromises = new Map<string, Promise<User>>();
 
-async function syncUserWithBackend(fbUser: { uid: string; email?: string | null; displayName?: string | null; getIdToken?: () => Promise<string> }): Promise<User> {
-  const existingPromise = syncPromises.get(fbUser.uid);
-  if (existingPromise) {
-    return existingPromise;
-  }
-  const promise = (async () => {
-    try {
-      let token = fbUser.uid;
-      if (typeof fbUser.getIdToken === 'function') {
-        token = await fbUser.getIdToken();
-      } else if (auth.currentUser) {
-        token = await auth.currentUser.getIdToken();
-      }
-
-      const res = await fetch('/api/users/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          name: fbUser.displayName || 'Google-användare',
-          targetCalories: 2400,
-          targetProtein: 160,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Kunde inte synkronisera användarprofil');
-      }
-
-      const userData = await res.json();
-      return {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        targetCalories: userData.targetCalories,
-        targetProtein: userData.targetProtein,
-        createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
-        goalsConfigured: userData.goalsConfigured ?? true,
-      };
-    } finally {
-      syncPromises.delete(fbUser.uid);
-    }
-  })();
-
-  syncPromises.set(fbUser.uid, promise);
+async function syncUserWithBackend(firebaseUser: FirebaseUserLike): Promise<User> {
+  const pending = syncPromises.get(firebaseUser.uid);
+  if (pending) return pending;
+  const promise = request<User>('/api/users/sync', { method: 'POST', body: '{}' })
+    .then(normalizeUser)
+    .finally(() => syncPromises.delete(firebaseUser.uid));
+  syncPromises.set(firebaseUser.uid, promise);
   return promise;
 }
 
 export const api = {
-  // Auth methods - Google Authentication client-side + SQL backend sync
   async signInWithGoogle(): Promise<User> {
     const result = await signInWithPopup(auth, googleProvider);
     return syncUserWithBackend(result.user);
   },
 
-  async syncUser(fbUser: { uid: string; email?: string | null; displayName?: string | null }): Promise<User> {
-    return syncUserWithBackend(fbUser);
+  syncUser(firebaseUser: FirebaseUserLike): Promise<User> {
+    return syncUserWithBackend(firebaseUser);
   },
 
-  async logout(): Promise<void> {
-    await fbSignOut(auth);
+  logout(): Promise<void> {
+    return firebaseSignOut(auth);
   },
 
   async updateGoals(targetCalories: number, targetProtein: number): Promise<User> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Ingen inloggad användare');
-
-    const headers = await getHeaders();
-    const res = await fetch('/api/users/goals', {
+    return normalizeUser(await request<User>('/api/users/goals', {
       method: 'PUT',
-      headers,
       body: JSON.stringify({ targetCalories, targetProtein }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Kunde inte uppdatera mål');
-    }
-
-    const userData = await res.json();
-    return {
-      id: userData.id,
-      email: userData.email,
-      name: userData.name,
-      targetCalories: userData.targetCalories,
-      targetProtein: userData.targetProtein,
-      createdAt: typeof userData.createdAt === 'string' ? userData.createdAt : new Date(userData.createdAt).toISOString(),
-      goalsConfigured: true,
-    };
+    }));
   },
 
-  // Ingredients (PostgreSQL / Cloud SQL)
-  async getIngredients(q?: string, barcode?: string): Promise<Ingredient[]> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-
+  getIngredients(q?: string, barcode?: string): Promise<Ingredient[]> {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (barcode) params.set('barcode', barcode);
-
-    const headers = await getHeaders();
-    const res = await fetch(`/api/ingredients?${params.toString()}`, { headers });
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta råvaror');
-    }
-    return res.json();
+    return request(`/api/ingredients?${params}`);
   },
 
   async getIngredientById(id: string): Promise<Ingredient | null> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return null;
-
-    const headers = await getHeaders();
-    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, { headers });
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta råvara');
+    try {
+      return await request(`/api/ingredients/${encodeURIComponent(id)}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
     }
-    return res.json();
   },
 
-  async getIngredientsByIds(ids: string[]): Promise<Ingredient[]> {
-    const currentUser = auth.currentUser;
-    if (!currentUser || !ids || !Array.isArray(ids) || ids.length === 0) return [];
-    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
-    if (uniqueIds.length === 0) return [];
-
-    const headers = await getHeaders();
-    const res = await fetch('/api/ingredients/batch', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ids: uniqueIds }),
-    });
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta råvaror i batch');
-    }
-    return res.json();
+  getIngredientsByIds(ids: string[]): Promise<Ingredient[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return request('/api/ingredients/batch', { method: 'POST', body: JSON.stringify({ ids: [...new Set(ids)] }) });
   },
 
-  async getRecentIngredients(): Promise<Ingredient[]> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-    const headers = await getHeaders();
-    const res = await fetch('/api/ingredients/recent', { headers });
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta senaste råvaror');
-    }
-    return res.json();
+  getRecentIngredients(): Promise<Ingredient[]> {
+    return request('/api/ingredients/recent');
   },
 
-  async createIngredient(data: {
-    name: string;
-    barcode?: string;
-    unit: BaseUnit;
-    caloriesPer100: number;
-    proteinPer100: number;
-    pieceWeight?: number | null;
-  }): Promise<Ingredient> {
-    const headers = await getHeaders();
-    const res = await fetch('/api/ingredients', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Kunde inte skapa råvara');
-    return res.json();
+  createIngredient(data: IngredientInput): Promise<Ingredient> {
+    return request('/api/ingredients', { method: 'POST', body: JSON.stringify(data) });
   },
 
-  async updateIngredient(id: string, data: {
-    name: string;
-    barcode?: string;
-    unit: BaseUnit;
-    caloriesPer100: number;
-    proteinPer100: number;
-    pieceWeight?: number | null;
-  }): Promise<Ingredient> {
-    const headers = await getHeaders();
-    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Kunde inte uppdatera råvara');
-    return res.json();
+  updateIngredient(id: string, data: IngredientInput): Promise<Ingredient> {
+    return request(`/api/ingredients/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
   },
 
   async deleteIngredient(id: string): Promise<boolean> {
-    const headers = await getHeaders();
-    const res = await fetch(`/api/ingredients/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers,
-    });
-    if (!res.ok) {
-      throw new Error('Kunde inte ta bort råvara');
-    }
-    const data = await res.json();
-    return data.success;
+    const result = await request<{ success: boolean }>(`/api/ingredients/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return result.success;
   },
 
-  // Meals
-  async getMeals(date: string): Promise<MealItem[]> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-    const headers = await getHeaders();
-    const res = await fetch(`/api/meals?date=${encodeURIComponent(date)}`, { headers });
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta måltider');
-    }
-    return res.json();
+  getMeals(date: string): Promise<MealItem[]> {
+    return request(`/api/meals?date=${encodeURIComponent(date)}`);
   },
 
-  async logMeal(item: {
-    date: string;
-    mealType: MealType;
-    ingredientId?: string | null;
-    amount?: number;
-    loggedUnit?: LoggedUnit | string;
-    calories?: number;
-    protein?: number;
-    ingredientName?: string;
-    name?: string;
-    baseUnit?: BaseUnit;
-  }): Promise<MealItem> {
-    const headers = await getHeaders();
-    const res = await fetch('/api/meals', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(item),
-    });
-    if (!res.ok) throw new Error('Kunde inte logga måltid');
-    return res.json();
+  logMeal(item: MealInput): Promise<MealItem> {
+    return request('/api/meals', { method: 'POST', body: JSON.stringify(item) });
   },
 
-  async logMealBatch(items: {
-    date: string;
-    mealType: MealType;
-    ingredientId?: string | null;
-    amount?: number;
-    loggedUnit?: LoggedUnit | string;
-    calories?: number;
-    protein?: number;
-    ingredientName?: string;
-    name?: string;
-    baseUnit?: BaseUnit;
-    pieceWeight?: number | null;
-  }[]): Promise<MealItem[]> {
-    const headers = await getHeaders();
-    const res = await fetch('/api/meals/batch', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ items }),
-    });
-    if (!res.ok) throw new Error('Kunde inte batch-logga måltider');
-    return res.json();
-  },
-
-  async updateMeal(
-    id: string,
-    amountOrData?: number | {
-      amount?: number;
-      loggedUnit?: LoggedUnit | string;
-      calories?: number;
-      protein?: number;
-      ingredientName?: string;
-      name?: string;
-    },
-    loggedUnit?: LoggedUnit | string,
-    options?: {
-      calories?: number;
-      protein?: number;
-      ingredientName?: string;
-      name?: string;
-    }
-  ): Promise<MealItem> {
-    const headers = await getHeaders();
-    let body: any;
-    if (typeof amountOrData === 'object' && amountOrData !== null) {
-      body = amountOrData;
-    } else {
-      body = {
-        amount: amountOrData,
-        loggedUnit,
-        calories: options?.calories,
-        protein: options?.protein,
-        ingredientName: options?.ingredientName || options?.name,
-        name: options?.name || options?.ingredientName,
-      };
-    }
-    const res = await fetch(`/api/meals/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error('Kunde inte uppdatera måltidsrad');
-    return res.json();
+  updateMeal(id: string, data: MealUpdate): Promise<MealItem> {
+    return request(`/api/meals/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
   },
 
   async deleteMeal(id: string): Promise<boolean> {
-    const headers = await getHeaders();
-    const res = await fetch(`/api/meals/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers,
-    });
-    if (!res.ok) {
-      throw new Error('Kunde inte ta bort måltidsrad');
-    }
-    const data = await res.json();
-    return data.success;
+    const result = await request<{ success: boolean }>(`/api/meals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return result.success;
   },
 
-  async copyMealFromDate(
-    targetDate: string,
-    targetMealType: MealType,
-    sourceDate: string,
-    sourceMealType: MealType
-  ): Promise<MealItem[]> {
-    const sourceItems = await this.getMeals(sourceDate);
-    const filtered = sourceItems.filter((i) => i.mealType === sourceMealType);
-    if (filtered.length === 0) return [];
-
-    const batch = filtered.map((item) => ({
-      date: targetDate,
-      mealType: targetMealType,
-      ingredientId: item.ingredientId || null,
-      amount: item.amount,
-      loggedUnit: item.loggedUnit,
-      baseUnit: item.baseUnit,
-      pieceWeight: item.pieceWeight,
-      calories: item.calories,
-      protein: item.protein,
-      ingredientName: item.ingredientName,
-      name: item.ingredientName,
-    }));
-
-    return this.logMealBatch(batch);
+  copyMealFromDate(input: CopyMealInput): Promise<MealItem[]> {
+    return request('/api/meals/copy', { method: 'POST', body: JSON.stringify(input) });
   },
 
-  // Recipes
-  async getRecipes(): Promise<Recipe[]> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return [];
-    const headers = await getHeaders();
-    const res = await fetch('/api/recipes', { headers });
-    if (!res.ok) {
-      throw new Error('Kunde inte hämta recept');
-    }
-    return res.json();
+  getRecipes(): Promise<Recipe[]> {
+    return request('/api/recipes');
   },
 
-  async createRecipe(
-    name: string,
-    items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[]
-  ): Promise<Recipe> {
-    const headers = await getHeaders();
-    const res = await fetch('/api/recipes', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ name, items }),
-    });
-    if (!res.ok) throw new Error('Kunde inte skapa recept');
-    return res.json();
+  createRecipe(input: RecipeInput): Promise<Recipe> {
+    return request('/api/recipes', { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  logRecipe(id: string, input: LogRecipeInput): Promise<MealItem[]> {
+    return request(`/api/recipes/${encodeURIComponent(id)}/log`, { method: 'POST', body: JSON.stringify(input) });
   },
 
   async deleteRecipe(id: string): Promise<boolean> {
-    const headers = await getHeaders();
-    const res = await fetch(`/api/recipes/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers,
-    });
-    if (!res.ok) {
-      throw new Error('Kunde inte ta bort recept');
-    }
-    const data = await res.json();
-    return data.success;
+    const result = await request<{ success: boolean }>(`/api/recipes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return result.success;
   },
 };

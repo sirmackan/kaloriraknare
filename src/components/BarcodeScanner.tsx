@@ -109,7 +109,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
         }
 
         setCameraActive(true);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) {
           try {
             scannerInstance?.stop();
@@ -121,7 +121,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
           return;
         }
         setCameraActive(false);
-        const msg = err?.message || String(err);
+        const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
           setErrorMsg('Kameratillstånd nekades.');
         } else {
@@ -188,6 +188,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
         <button
           type="button"
           id="toggle-torch-btn"
+          aria-label={isTorchOn ? 'Släck lampa' : 'Tänd lampa'}
           onClick={toggleTorch}
           title={isTorchOn ? 'Släck lampa' : 'Tänd lampa'}
           className={`absolute top-2.5 right-2.5 z-30 p-2.5 rounded-xl backdrop-blur-md transition active:scale-90 ${

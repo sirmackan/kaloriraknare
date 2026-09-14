@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { DateHeader } from './components/DateHeader';
@@ -15,11 +15,10 @@ import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { GoogleSignInScreen } from './components/GoogleSignInScreen';
 import { getTodayString, addDays } from './utils/date';
-import { api } from './services/api';
 import {
   useMealsQuery,
   useLogMealMutation,
-  useLogMealBatchMutation,
+  useLogRecipeMutation,
   useUpdateMealMutation,
   useDeleteMealMutation,
   useCopyMealFromDateMutation,
@@ -28,11 +27,11 @@ import {
   useDeleteIngredientMutation,
   getOrFetchIngredient,
 } from './hooks/useNutritionQueries';
-import type { MealItem, MealType, Ingredient, Recipe, LoggedUnit } from './types';
+import type { MealItem, MealType, Ingredient, Recipe, LoggedUnit, BaseUnit } from './types';
 import { MEAL_TYPES, MEAL_DEFINITE_LABELS } from './types';
 import { AlertCircle, X } from 'lucide-react';
 
-const slideVariants = {
+const slideVariants: Variants = {
   enter: (direction: number) => ({
     x: direction > 0 ? 100 : direction < 0 ? -100 : 0,
     opacity: 0,
@@ -87,6 +86,8 @@ export type ActiveModal =
   | { type: 'copyYesterday'; targetMealType: MealType }
   | null;
 
+const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 function AppContent() {
   const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
@@ -94,11 +95,17 @@ function AppContent() {
   const [direction, setDirection] = useState<number>(0);
 
   // TanStack Query for meals
-  const { data: mealItems = [] } = useMealsQuery(currentDate, Boolean(user));
+  const {
+    data: mealItems = [],
+    isPending: mealsLoading,
+    isError: mealsFailed,
+    error: mealsError,
+    refetch: refetchMeals,
+  } = useMealsQuery(currentDate, Boolean(user));
 
   // TanStack Query Mutations
   const logMealMutation = useLogMealMutation();
-  const logMealBatchMutation = useLogMealBatchMutation();
+  const logRecipeMutation = useLogRecipeMutation();
   const updateMealMutation = useUpdateMealMutation();
   const deleteMealMutation = useDeleteMealMutation();
   const copyMealFromDateMutation = useCopyMealFromDateMutation();
@@ -193,8 +200,9 @@ function AppContent() {
       if (copied.length === 0) {
         showErrorToast(`Det fanns inga råvaror i ${MEAL_DEFINITE_LABELS[sourceMealType]} att kopiera.`);
       }
-    } catch (err: any) {
-      showErrorToast(err.message || 'Kunde inte kopiera måltid');
+    } catch (err: unknown) {
+      showErrorToast(err instanceof Error ? err.message : 'Kunde inte kopiera måltid');
+      throw err;
     } finally {
       setCopyingMeal(null);
     }
@@ -212,7 +220,7 @@ function AppContent() {
     }
 
     try {
-      const fetchedIng = await getOrFetchIngredient(queryClient, item.ingredientId);
+      const fetchedIng = await getOrFetchIngredient(queryClient, user?.id ?? '', item.ingredientId);
       if (!fetchedIng) {
         showErrorToast('Råvaran kunde inte hittas');
         return;
@@ -227,9 +235,9 @@ function AppContent() {
         initialAmount: item.amount,
         initialUnit: item.loggedUnit,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      showErrorToast(err.message || 'Kunde inte öppna råvaran');
+      showErrorToast(errorMessage(err, 'Kunde inte öppna råvaran'));
     }
   };
 
@@ -243,13 +251,17 @@ function AppContent() {
     try {
       await deleteMealMutation.mutateAsync({ id: mealItemToDelete.id, date: currentDate });
       setMealItemToDelete(null);
-    } catch (err: any) {
-      showErrorToast(err.message || 'Kunde inte radera måltidsrad');
+    } catch (err: unknown) {
+      showErrorToast(errorMessage(err, 'Kunde inte radera måltidsrad'));
     }
   };
 
   // Save entire meal as recipe
   const handleSaveMealAsRecipe = (mealType: MealType, items: MealItem[]) => {
+    if (items.some((item) => !item.ingredientId)) {
+      showErrorToast('Snabbloggade rader kan inte sparas i recept. Ta bort dem eller logga dem som råvaror först.');
+      return;
+    }
     setActiveModal({
       type: 'recipe',
       initialMealToSave: { mealType, items, date: currentDate },
@@ -259,18 +271,10 @@ function AppContent() {
   // Expand recipe into individual meal items
   const handleLogRecipe = async (recipe: Recipe, mealType: MealType) => {
     try {
-      const batchItems = recipe.items.map((i) => ({
-        date: currentDate,
-        mealType,
-        ingredientId: i.ingredientId,
-        amount: i.amount,
-        loggedUnit: i.loggedUnit,
-      }));
-
-      await logMealBatchMutation.mutateAsync(batchItems);
+      await logRecipeMutation.mutateAsync({ id: recipe.id, input: { date: currentDate, mealType } });
       setActiveModal(null);
-    } catch (err: any) {
-      showErrorToast(err.message || 'Kunde inte logga recept');
+    } catch (err: unknown) {
+      showErrorToast(errorMessage(err, 'Kunde inte logga recept'));
     }
   };
 
@@ -281,22 +285,22 @@ function AppContent() {
       if (activeModal.isEditing && activeModal.existingItemId) {
         await updateMealMutation.mutateAsync({
           id: activeModal.existingItemId,
-          amount,
-          loggedUnit: unit,
+          update: { kind: 'ingredient', amount, loggedUnit: unit === 'port' ? activeModal.ingredient.unit : unit },
           date: currentDate,
         });
       } else {
         await logMealMutation.mutateAsync({
+          kind: 'ingredient',
           date: currentDate,
           mealType: activeModal.mealType,
           ingredientId: activeModal.ingredient.id,
           amount,
-          loggedUnit: unit,
+          loggedUnit: unit === 'port' ? activeModal.ingredient.unit : unit,
         });
       }
       setActiveModal(null);
-    } catch (err: any) {
-      showErrorToast(err.message || 'Kunde inte spara mängd');
+    } catch (err: unknown) {
+      showErrorToast(errorMessage(err, 'Kunde inte spara mängd'));
     }
   };
 
@@ -309,34 +313,32 @@ function AppContent() {
   }) => {
     try {
       if (data.editingItemId) {
-        await api.updateMeal(data.editingItemId, {
-          amount: 1,
-          loggedUnit: 'port',
+        await updateMealMutation.mutateAsync({
+          id: data.editingItemId,
+          date: currentDate,
+          update: {
+          kind: 'quick',
           calories: data.calories,
           protein: data.protein,
-          ingredientName: data.name,
-          name: data.name,
+          name: data.name?.trim() || 'Snabblogg',
+          },
         });
-        queryClient.invalidateQueries({ queryKey: ['meals', currentDate] });
-        queryClient.invalidateQueries({ queryKey: ['ingredients', 'recent'] });
       } else {
         const mealType = (activeModal?.type === 'log' || activeModal?.type === 'quickLog')
           ? activeModal.mealType
           : 'lunch';
-        await api.logMeal({
+        await logMealMutation.mutateAsync({
+          kind: 'quick',
           date: currentDate,
           mealType,
           calories: data.calories,
           protein: data.protein,
-          ingredientName: data.name,
-          name: data.name,
+          name: data.name?.trim() || 'Snabblogg',
         });
-        queryClient.invalidateQueries({ queryKey: ['meals', currentDate] });
-        queryClient.invalidateQueries({ queryKey: ['ingredients', 'recent'] });
       }
       setActiveModal(null);
-    } catch (err: any) {
-      showErrorToast(err.message || 'Kunde inte spara snabblogg');
+    } catch (err: unknown) {
+      showErrorToast(errorMessage(err, 'Kunde inte spara snabblogg'));
     }
   };
 
@@ -344,14 +346,14 @@ function AppContent() {
   const handleSaveIngredient = async (ingredientData: {
     name: string;
     barcode?: string;
-    unit: any;
+    unit: BaseUnit;
     caloriesPer100: number;
     proteinPer100: number;
     pieceWeight?: number | null;
   }) => {
     try {
       if (activeModal?.type === 'ingredient' && activeModal.editingIngredient) {
-        const updated = await updateIngredientMutation.mutateAsync({
+        await updateIngredientMutation.mutateAsync({
           id: activeModal.editingIngredient.id,
           data: ingredientData,
         });
@@ -368,9 +370,9 @@ function AppContent() {
           isEditing: false,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Save ingredient error:', err);
-      showErrorToast(err.message || 'Kunde inte spara råvara');
+      showErrorToast(errorMessage(err, 'Kunde inte spara råvara'));
       throw err;
     }
   };
@@ -384,9 +386,10 @@ function AppContent() {
       ) {
         setActiveModal(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete ingredient error:', err);
-      showErrorToast(err.message || 'Kunde inte ta bort råvara');
+      showErrorToast(errorMessage(err, 'Kunde inte ta bort råvara'));
+      throw err;
     }
   };
 
@@ -454,6 +457,18 @@ function AppContent() {
               }}
               className="p-4 space-y-4 flex-1 touch-pan-y"
             >
+              {mealsFailed ? (
+                <section role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  <p className="font-semibold">Dagens måltider kunde inte hämtas.</p>
+                  <p className="mt-1 text-xs opacity-80">{mealsError instanceof Error ? mealsError.message : 'Försök igen.'}</p>
+                  <button type="button" onClick={() => void refetchMeals()} className="mt-3 rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white">Försök igen</button>
+                </section>
+              ) : mealsLoading ? (
+                <div role="status" className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                  Laddar dagens måltider…
+                </div>
+              ) : (
+                <>
               {/* Daily Progress Gauge Card */}
               <DailySummaryCard
                 totalCalories={totalCalories}
@@ -478,6 +493,8 @@ function AppContent() {
                   />
                 ))}
               </div>
+                </>
+              )}
             </motion.main>
           </AnimatePresence>
         </div>

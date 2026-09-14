@@ -41,8 +41,9 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
       id={`${idPrefix}-row-${id}`}
       className="px-3.5 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition group"
     >
-      <div
-        className="flex-1 min-w-0 cursor-pointer"
+      <button
+        type="button"
+        className="flex-1 min-w-0 cursor-pointer text-left"
         onClick={onEdit}
       >
         <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
@@ -63,7 +64,7 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
           <span>•</span>
           <span className="text-sky-600 dark:text-sky-300 font-medium">{protein} g protein</span>
         </div>
-      </div>
+      </button>
 
       <div className="flex items-center gap-1 shrink-0">
         <button

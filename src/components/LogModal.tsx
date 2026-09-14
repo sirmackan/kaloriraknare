@@ -9,6 +9,7 @@ import {
   useIngredientsQuery,
   useRecipesQuery,
 } from '../hooks/useNutritionQueries';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface LogModalProps {
   mealType: MealType;
@@ -57,6 +58,8 @@ export const LogModal: React.FC<LogModalProps> = ({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isScanningCamera, setIsScanningCamera] = useState(false);
   const [loggingRecipeId, setLoggingRecipeId] = useState<string | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const dialogRef = useDialogAccessibility(onClose, isSubmittingQuick || loggingRecipeId !== null);
 
   // Debounce search input by 280ms
   useEffect(() => {
@@ -67,13 +70,18 @@ export const LogModal: React.FC<LogModalProps> = ({
   }, [query]);
 
   // TanStack Queries
-  const { data: recentIngredients = [] } = useRecentIngredientsQuery();
-  const { data: searchResults = [], isFetching: isSearching } = useIngredientsQuery(debouncedQuery);
-  const { data: recipes = [] } = useRecipesQuery();
+  const isTypedEan13 = /^\d{13}$/.test(debouncedQuery);
+  const { data: recentIngredients = [], isError: recentFailed } = useRecentIngredientsQuery();
+  const { data: searchResults = [], isFetching: isSearching, isError: searchFailed } = useIngredientsQuery(
+    isTypedEan13 ? undefined : debouncedQuery,
+    isTypedEan13 ? debouncedQuery : undefined,
+  );
+  const { data: recipes = [], isError: recipesFailed } = useRecipesQuery();
 
   // Handle scanned barcode
   const handleBarcodeScanned = async (barcode: string) => {
     setIsScanningCamera(false);
+    setLookupError(null);
     try {
       const matches = await api.getIngredients(undefined, barcode);
       if (matches.length > 0) {
@@ -85,7 +93,7 @@ export const LogModal: React.FC<LogModalProps> = ({
       }
     } catch (err) {
       console.error(err);
-      onRequestCreateIngredient(barcode);
+      setLookupError(err instanceof Error ? err.message : 'Kunde inte slå upp streckkoden');
     }
   };
 
@@ -115,19 +123,20 @@ export const LogModal: React.FC<LogModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-150 transition-colors">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="log-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-150 transition-colors">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
           <div>
             <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
               Logga måltid
             </span>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 id="log-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
               {MEAL_LABELS[mealType]}
             </h3>
           </div>
           <button
             id="close-log-modal-btn"
+            aria-label="Stäng"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
           >
@@ -205,6 +214,7 @@ export const LogModal: React.FC<LogModalProps> = ({
                 {query && (
                   <button
                     onClick={() => setQuery('')}
+                    aria-label="Rensa sökning"
                     className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 p-0.5"
                   >
                     <X className="w-4 h-4" />
@@ -236,6 +246,10 @@ export const LogModal: React.FC<LogModalProps> = ({
               </div>
             )}
 
+            {lookupError && (
+              <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{lookupError}</div>
+            )}
+
             {/* If user is typing query */}
             {query.trim() ? (
               <div className="space-y-1.5">
@@ -243,6 +257,10 @@ export const LogModal: React.FC<LogModalProps> = ({
                   <span>Sökresultat ({searchResults.length})</span>
                   {isSearching && <span className="text-emerald-600 dark:text-emerald-400 text-[11px] animate-pulse">Söker...</span>}
                 </div>
+
+                {searchFailed && (
+                  <div role="alert" className="p-3 text-center text-xs text-rose-600 dark:text-rose-400">Sökningen misslyckades. Försök igen.</div>
+                )}
 
                 {searchResults.length === 0 && !isSearching && debouncedQuery ? (
                   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center space-y-2.5">
@@ -265,6 +283,14 @@ export const LogModal: React.FC<LogModalProps> = ({
                         key={ing.id}
                         id={`search-result-${ing.id}`}
                         onClick={() => onSelectIngredient(ing)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onSelectIngredient(ing);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
                         className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition active:bg-slate-200 dark:active:bg-slate-700"
                       >
                         <div className="min-w-0 flex-1">
@@ -326,7 +352,7 @@ export const LogModal: React.FC<LogModalProps> = ({
                 {recentIngredients.length === 0 ? (
                   <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center space-y-2">
                     <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Du har inga tidigare använda råvaror än.
+                      {recentFailed ? 'Senast använda råvaror kunde inte hämtas.' : 'Du har inga tidigare använda råvaror än.'}
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       Sök i fältet ovan eller skanna en streckkod för att logga matvaror.
@@ -339,6 +365,14 @@ export const LogModal: React.FC<LogModalProps> = ({
                         key={ing.id}
                         id={`recent-ing-${ing.id}`}
                         onClick={() => onSelectIngredient(ing)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onSelectIngredient(ing);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
                         className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition active:bg-slate-200 dark:active:bg-slate-700"
                       >
                         <div className="min-w-0 flex-1">
@@ -388,7 +422,9 @@ export const LogModal: React.FC<LogModalProps> = ({
               Välj ett sparat recept för att expandera alla ingredienser direkt i {MEAL_DEFINITE_LABELS[mealType]}.
             </div>
 
-            {recipes.length === 0 ? (
+            {recipesFailed ? (
+              <div role="alert" className="py-8 text-center text-xs text-rose-600 dark:text-rose-400">Recepten kunde inte hämtas. Försök igen.</div>
+            ) : recipes.length === 0 ? (
               <div className="py-8 text-center space-y-2">
                 <BookOpen className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto" />
                 <p className="text-xs text-slate-500 dark:text-slate-400">Inga sparade recept ännu.</p>

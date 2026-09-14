@@ -82,7 +82,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({
                   ? 'bg-emerald-500'
                   : 'bg-amber-500'
               }`}
-              style={{ width: `${Math.min(100, calConsumedPct)}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, calConsumedPct))}%` }}
             />
           </div>
         </div>
@@ -148,7 +148,7 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({
               className={`h-full rounded-full transition-all duration-500 ${
                 isProteinReached ? 'bg-emerald-500' : 'bg-sky-500'
               }`}
-              style={{ width: `${Math.min(100, proConsumedPct)}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, proConsumedPct))}%` }}
             />
           </div>
         </div>

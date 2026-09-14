@@ -4,6 +4,7 @@ import type { MealItem, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
 import { addDays, formatHeaderDate } from '../utils/date';
 import { useMealsQuery } from '../hooks/useNutritionQueries';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface CopyYesterdayModalProps {
   targetMealType: MealType;
@@ -22,8 +23,10 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(() => addDays(currentDate, -1));
   const [copyingSource, setCopyingSource] = useState<MealType | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const dialogRef = useDialogAccessibility(onClose, copyingSource !== null);
 
-  const { data: items = [], isLoading: loading } = useMealsQuery(selectedDate, true);
+  const { data: items = [], isLoading: loading, isError: loadingFailed, refetch } = useMealsQuery(selectedDate, true);
 
   const yesterdayDate = addDays(currentDate, -1);
   const dayBeforeYesterday = addDays(currentDate, -2);
@@ -48,9 +51,12 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
   const handleSelect = async (sourceMealType: MealType) => {
     if (copyingSource) return;
     try {
+      setCopyError(null);
       setCopyingSource(sourceMealType);
       await onCopy(targetMealType, sourceMealType, selectedDate);
       onClose();
+    } catch (error) {
+      setCopyError(error instanceof Error ? error.message : 'Måltiden kunde inte kopieras');
     } finally {
       setCopyingSource(null);
     }
@@ -63,6 +69,11 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="copy-meal-title"
+        tabIndex={-1}
         id="copy-yesterday-modal"
         className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto transition-colors"
       >
@@ -73,11 +84,11 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
               <History className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+              <h3 id="copy-meal-title" className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                 Kopiera måltid
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Till dagens <span className="font-semibold text-emerald-600 dark:text-emerald-400">{MEAL_LABELS[targetMealType].toLowerCase()}</span>
+                Till {formatHeaderDate(currentDate).label.toLowerCase()}, <span className="font-semibold text-emerald-600 dark:text-emerald-400">{MEAL_LABELS[targetMealType].toLowerCase()}</span>
               </p>
             </div>
           </div>
@@ -90,6 +101,13 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {(copyError || loadingFailed) && (
+          <div role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+            {copyError ?? 'Måltiderna kunde inte hämtas.'}
+            {loadingFailed && <button type="button" onClick={() => void refetch()} className="ml-2 font-bold underline">Försök igen</button>}
+          </div>
+        )}
 
         {/* Date Selector Section */}
         <div className="pt-3 pb-2 space-y-2 border-b border-slate-100 dark:border-slate-800/80">

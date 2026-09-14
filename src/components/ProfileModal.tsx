@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, Target, User as UserIcon, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface ProfileModalProps {
   onClose: () => void;
@@ -16,6 +17,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
   const [isSavingGoals, setIsSavingGoals] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const dialogRef = useDialogAccessibility(onClose, isSavingGoals || isLoggingOut);
+
+  const handleLogout = async () => {
+    try {
+      setGoalError(null);
+      setIsLoggingOut(true);
+      await logout();
+      onClose();
+    } catch (error) {
+      setGoalError(error instanceof Error ? error.message : 'Kunde inte logga ut.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const handleSaveGoals = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,9 +54,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
         await updateGoals(cals, pros);
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 2000);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setGoalError(err.message || 'Kunde inte spara dina mål.');
+        setGoalError(err instanceof Error ? err.message : 'Kunde inte spara dina mål.');
       } finally {
         setIsSavingGoals(false);
       }
@@ -49,16 +65,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto my-auto transition-colors">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto my-auto transition-colors">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 id="profile-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
               Personliga mål & konto
             </h3>
           </div>
           <button
             id="close-profile-modal-btn"
+            aria-label="Stäng"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition touch-manipulation"
           >
@@ -122,7 +139,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 transition-colors">
-              <label className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
+              <label htmlFor="profile-cal-goal-input" className="block text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
                 Kalorimål (kcal)
               </label>
               <input
@@ -131,6 +148,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                 type="number"
                 step="1"
                 min="1"
+                max="20000"
                 inputMode="numeric"
                 autoComplete="off"
                 autoCorrect="off"
@@ -146,7 +164,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 transition-colors">
-              <label className="block text-xs font-semibold text-sky-600 dark:text-sky-400 mb-1">
+              <label htmlFor="profile-pro-goal-input" className="block text-xs font-semibold text-sky-600 dark:text-sky-400 mb-1">
                 Proteinmål (g)
               </label>
               <input
@@ -155,6 +173,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                 type="number"
                 step="1"
                 min="1"
+                max="1000"
                 inputMode="numeric"
                 autoComplete="off"
                 autoCorrect="off"
@@ -221,14 +240,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
                 </div>
                 <button
                   id="logout-btn"
-                  onClick={() => {
-                    logout();
-                    onClose();
-                  }}
+                  onClick={() => void handleLogout()}
+                  disabled={isLoggingOut}
                   className="shrink-0 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition touch-manipulation active:scale-95"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>Logga ut</span>
+                  <span>{isLoggingOut ? 'Loggar ut…' : 'Logga ut'}</span>
                 </button>
               </div>
             </div>

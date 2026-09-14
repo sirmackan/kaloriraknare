@@ -1,4 +1,4 @@
-import type { Ingredient, MealItem, Recipe, MealType } from '../../src/types';
+import type { Ingredient } from '../../src/types';
 
 export const swedishIngredients: Record<string, Ingredient> = {
   agg: {
@@ -10,6 +10,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 12.6,
     pieceWeight: 55,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   prastost: {
@@ -21,6 +22,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 26,
     pieceWeight: 20,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   ragbrod: {
@@ -32,6 +34,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 7.0,
     pieceWeight: 40,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   bregott: {
@@ -43,6 +46,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 0.6,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   kyckling: {
@@ -54,6 +58,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 23.0,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   ris: {
@@ -65,6 +70,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 7.2,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   mjolk: {
@@ -76,6 +82,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 3.4,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   havregryn: {
@@ -87,6 +94,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 13.0,
     pieceWeight: 40,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   protein_skopa: {
@@ -98,6 +106,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 75.0,
     pieceWeight: 30,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   kaffe: {
@@ -109,6 +118,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 0.2,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   krydda: {
@@ -120,6 +130,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
     proteinPer100: 10.0,
     pieceWeight: null,
     createdByUserId: 'system',
+    isDeleted: false,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
 };

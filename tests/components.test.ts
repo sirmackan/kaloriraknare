@@ -97,11 +97,13 @@ describe('rendered component contracts', () => {
         id: 'standard-1', userId: 'user-1', date: '2026-09-14', mealType: 'dinner',
         ingredientId: swedishIngredients.kyckling.id, ingredientName: 'Kyckling', amount: 200,
         loggedUnit: 'g', baseUnit: 'g', calories: 220, protein: 46, createdAt: '',
+        pieceWeight: null,
       },
       {
         id: 'quick-1', userId: 'user-1', date: '2026-09-14', mealType: 'dinner',
         ingredientId: null, ingredientName: 'Sås & tillbehör', amount: 1,
         loggedUnit: 'port', baseUnit: 'g', calories: 320, protein: 4.5, createdAt: '',
+        pieceWeight: null,
       },
     ];
     const html = renderToString(React.createElement(MealCard, {

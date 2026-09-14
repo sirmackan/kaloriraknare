@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, BookOpen, Utensils, Search, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Recipe, Ingredient, LoggedUnit, MealType } from '../types';
+import type { Recipe, Ingredient, LoggedUnit, MealType, MealItem } from '../types';
 import { MEAL_LABELS } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { FoodItemRow } from './FoodItemRow';
@@ -12,12 +12,13 @@ import {
   useIngredientsQuery,
   useCreateRecipeMutation,
   useDeleteRecipeMutation,
-  nutritionKeys,
   resolveIngredientsBatch,
 } from '../hooks/useNutritionQueries';
+import { useAuth } from '../context/AuthContext';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface RecipeModalProps {
-  initialMealToSave?: { mealType: MealType; items: any[]; date?: string } | null;
+  initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
   onClose: () => void;
 }
 
@@ -26,7 +27,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   onClose,
 }) => {
   const queryClient = useQueryClient();
-  const { data: recipes = [], isLoading: loading } = useRecipesQuery();
+  const { user } = useAuth();
+  const { data: recipes = [], isLoading: loading, isError: recipesFailed } = useRecipesQuery();
   const createRecipeMutation = useCreateRecipeMutation();
   const deleteRecipeMutation = useDeleteRecipeMutation();
 
@@ -37,7 +39,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [recipeItems, setRecipeItems] = useState<{
     ingredient: Ingredient;
     amount: number;
-    unit: LoggedUnit | string;
+    unit: LoggedUnit;
   }[]>([]);
 
   const hasInitializedFromMeal = useRef(false);
@@ -54,12 +56,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data: searchResults = [], isFetching: isSearching } = useIngredientsQuery(debouncedSearchQuery);
+  const { data: searchResults = [], isFetching: isSearching, isError: searchFailed } = useIngredientsQuery(debouncedSearchQuery);
 
   // Modals for adding / editing ingredient amount in recipe
   const [addingIngredient, setAddingIngredient] = useState<Ingredient | null>(null);
   const [editingRecipeItemIndex, setEditingRecipeItemIndex] = useState<number | null>(null);
   const [recipeError, setRecipeError] = useState<string | null>(null);
+  const dialogRef = useDialogAccessibility(onClose, createRecipeMutation.isPending || deleteRecipeMutation.isPending);
 
   useEffect(() => {
     if (initialMealToSave && initialMealToSave.items.length > 0 && !hasInitializedFromMeal.current) {
@@ -71,30 +74,18 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       let isMounted = true;
 
       const resolveIngredients = async () => {
-        const uniqueIds: string[] = Array.from(new Set<string>(initialMealToSave.items.map((i: any) => String(i.ingredientId))));
-        const ingredientMap = await resolveIngredientsBatch(queryClient, uniqueIds);
-
-        const mappedItems = initialMealToSave.items.map((item: any) => {
-          const authenticIng = ingredientMap.get(item.ingredientId) || {
-            id: item.ingredientId,
-            name: item.ingredientName,
-            unit: item.baseUnit,
-            caloriesPer100: 0,
-            proteinPer100: 0,
-            pieceWeight: item.pieceWeight,
-            createdByUserId: 'system',
-            createdAt: new Date().toISOString(),
-          };
-
-          return {
-            ingredient: authenticIng,
+        try {
+          const uniqueIds = [...new Set(initialMealToSave.items.flatMap((item) => item.ingredientId ? [item.ingredientId] : []))];
+          const ingredientMap = await resolveIngredientsBatch(queryClient, user?.id ?? '', uniqueIds);
+          if (ingredientMap.size !== uniqueIds.length) throw new Error('En eller flera råvaror saknas eller har tagits bort');
+          const mappedItems = initialMealToSave.items.map((item) => ({
+            ingredient: ingredientMap.get(item.ingredientId!)!,
             amount: item.amount,
             unit: item.loggedUnit,
-          };
-        });
-
-        if (isMounted) {
-          setRecipeItems(mappedItems);
+          }));
+          if (isMounted) setRecipeItems(mappedItems);
+        } catch (error) {
+          if (isMounted) setRecipeError(error instanceof Error ? error.message : 'Kunde inte läsa måltidens råvaror');
         }
       };
 
@@ -104,7 +95,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         isMounted = false;
       };
     }
-  }, [initialMealToSave, queryClient]);
+  }, [initialMealToSave, queryClient, user?.id]);
 
   const selectIngredientToAdd = (ing: Ingredient) => {
     setAddingIngredient(ing);
@@ -112,13 +103,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     setDebouncedSearchQuery('');
   };
 
-  const handleConfirmAddIngredient = (amount: number, unit: LoggedUnit | string) => {
+  const handleConfirmAddIngredient = (amount: number, unit: LoggedUnit) => {
     if (!addingIngredient) return;
     setRecipeItems([...recipeItems, { ingredient: addingIngredient, amount, unit }]);
     setAddingIngredient(null);
   };
 
-  const handleConfirmEditIngredient = (amount: number, unit: LoggedUnit | string) => {
+  const handleConfirmEditIngredient = (amount: number, unit: LoggedUnit) => {
     if (editingRecipeItemIndex === null) return;
     const updated = [...recipeItems];
     updated[editingRecipeItemIndex] = {
@@ -149,7 +140,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const payload = recipeItems.map((i) => ({
         ingredientId: i.ingredient.id,
         amount: Math.max(0.01, i.amount),
-        loggedUnit: i.unit as LoggedUnit,
+        loggedUnit: i.unit === 'port' ? i.ingredient.unit : i.unit,
       }));
       await createRecipeMutation.mutateAsync({
         name: recipeName.trim(),
@@ -158,8 +149,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       setActiveTab('list');
       setRecipeName('');
       setRecipeItems([]);
-    } catch (err: any) {
-      setRecipeError(err.message || 'Kunde inte spara recept');
+    } catch (err: unknown) {
+      setRecipeError(err instanceof Error ? err.message : 'Kunde inte spara recept');
     }
   };
 
@@ -169,24 +160,25 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       setRecipeError(null);
       await deleteRecipeMutation.mutateAsync(recipeToDelete.id);
       setRecipeToDelete(null);
-    } catch (err: any) {
-      setRecipeError(err?.message || 'Kunde inte ta bort recept');
+    } catch (err: unknown) {
+      setRecipeError(err instanceof Error ? err.message : 'Kunde inte ta bort recept');
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto transition-colors">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="recipe-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto transition-colors">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 id="recipe-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
               Sparade recept
             </h3>
           </div>
           <button
             id="close-recipe-modal-btn"
+            aria-label="Stäng"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
           >
@@ -237,6 +229,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           {activeTab === 'list' ? (
             loading ? (
               <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">Laddar recept...</div>
+            ) : recipesFailed ? (
+              <div role="alert" className="py-8 text-center text-xs text-rose-600 dark:text-rose-400">Recepten kunde inte hämtas. Stäng och försök igen.</div>
             ) : (
               <div className="space-y-3">
                 {recipes.length === 0 ? (
@@ -306,7 +300,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
             /* Create Recipe Tab */
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="recipe-name-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Receptets namn *
                 </label>
                 <input
@@ -328,7 +322,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
               {/* Add ingredient search */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="recipe-ingredient-search-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Lägg till ingredienser
                 </label>
                 <div className="relative">
@@ -356,6 +350,10 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                   </div>
                 )}
 
+                {searchFailed && debouncedSearchQuery && (
+                  <div role="alert" className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">Sökningen misslyckades. Försök igen.</div>
+                )}
+
                 {searchResults.length > 0 && (
                   <div className="mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden shadow-xl">
                     {searchResults.map((ing) => (
@@ -363,6 +361,14 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                         key={ing.id}
                         id={`search-ing-${ing.id}`}
                         onClick={() => selectIngredientToAdd(ing)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            selectIngredientToAdd(ing);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
                         className="p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs transition"
                       >
                         <div>

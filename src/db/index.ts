@@ -8,14 +8,20 @@ declare global {
   var _postgresPool: Pool | undefined;
 }
 
+function requiredEnvironmentVariable(name: 'SQL_HOST' | 'SQL_USER' | 'SQL_PASSWORD' | 'SQL_DB_NAME') {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set`);
+  return value;
+}
+
 // Function to create or retrieve the connection pool.
 export const createPool = () => {
   if (!global._postgresPool) {
     global._postgresPool = new Pool({
-      host: process.env.SQL_HOST,
-      user: process.env.SQL_USER,
-      password: process.env.SQL_PASSWORD,
-      database: process.env.SQL_DB_NAME,
+      host: requiredEnvironmentVariable('SQL_HOST'),
+      user: requiredEnvironmentVariable('SQL_USER'),
+      password: requiredEnvironmentVariable('SQL_PASSWORD'),
+      database: requiredEnvironmentVariable('SQL_DB_NAME'),
       max: 10,
       connectionTimeoutMillis: 15000,
     });
@@ -27,14 +33,16 @@ export const createPool = () => {
 
     // Configure pg_trgm word_similarity threshold for typo-tolerant matching
     global._postgresPool.on('connect', (client) => {
-      client.query('SET pg_trgm.word_similarity_threshold = 0.3;').catch(() => {});
+      void client.query('SET pg_trgm.word_similarity_threshold = 0.3;').catch((error) => {
+        console.error('Failed to configure pg_trgm similarity threshold:', error);
+      });
     });
   }
   return global._postgresPool;
 };
 
 // Create or retrieve the pool instance.
-const pool = createPool();
+export const pool = createPool();
 
 // Initialize Drizzle with the pool and schema.
 export const db = drizzle(pool, { schema });

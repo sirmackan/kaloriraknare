@@ -3,6 +3,7 @@ import { X, Check, Barcode, Trash2, ScanBarcode } from 'lucide-react';
 import type { BaseUnit, Ingredient } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BarcodeScanner } from './BarcodeScanner';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface IngredientModalProps {
   initialBarcode?: string;
@@ -53,6 +54,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
   const isSubmitting = isSubmittingProp !== undefined ? isSubmittingProp : localSubmitting;
   const isDeleting = isDeletingProp !== undefined ? isDeletingProp : localDeleting;
+  const dialogRef = useDialogAccessibility(onClose, isSubmitting || isDeleting);
 
   const handleConfirmDelete = async () => {
     if (!editingIngredient || !onDelete) return;
@@ -62,8 +64,8 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
       await onDelete(editingIngredient.id);
       setShowDeleteModal(false);
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Kunde inte ta bort råvaran');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Kunde inte ta bort råvaran');
       setShowDeleteModal(false);
     } finally {
       setLocalDeleting(false);
@@ -75,6 +77,10 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
     setError(null);
     if (!name.trim()) {
       setError('Namn på råvaran krävs');
+      return;
+    }
+    if (barcode.trim() && !/^\d{13}$/.test(barcode.trim())) {
+      setError('Streckkoden måste vara exakt 13 siffror');
       return;
     }
     const sanitizedCal = typeof caloriesPer100 === 'string' ? caloriesPer100.replace(',', '.') : String(caloriesPer100);
@@ -122,8 +128,8 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
         proteinPer100: pro,
         pieceWeight: pwNum,
       });
-    } catch (err: any) {
-      setError(err?.message || 'Ett fel uppstod när råvaran skulle sparas');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ett fel uppstod när råvaran skulle sparas');
     } finally {
       setLocalSubmitting(false);
     }
@@ -131,15 +137,16 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto my-auto transition-colors">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ingredient-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto my-auto transition-colors">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 id="ingredient-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
               {editingIngredient ? 'Redigera råvara' : 'Ny råvara'}
             </h3>
           </div>
           <button
             id="close-ingredient-modal-btn"
+            aria-label="Stäng"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
           >
@@ -156,7 +163,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
         <form onSubmit={handleSubmit} autoComplete="off" data-form-type="other" className="space-y-3.5">
           {/* Namn */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label htmlFor="ingredient-name-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Råvarans namn *
             </label>
             <input
@@ -209,7 +216,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
               name="item_barcode"
               type="text"
               inputMode="numeric"
-              pattern="[0-9]*"
+              pattern="[0-9]{13}"
               maxLength={13}
               autoComplete="off"
               autoCorrect="off"
@@ -219,7 +226,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
               data-1p-ignore="true"
               placeholder="T.ex. 7310865004703 (13 siffror)"
               value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
+              onChange={(e) => setBarcode(e.target.value.replace(/\D/g, '').slice(0, 13))}
               className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
             />
           </div>
@@ -265,7 +272,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">
+                <label htmlFor="ingredient-cal-input" className="block text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">
                   Kalorier (kcal) *
                 </label>
                 <input
@@ -293,7 +300,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs text-sky-600 dark:text-sky-400 font-semibold mb-1">
+                <label htmlFor="ingredient-pro-input" className="block text-xs text-sky-600 dark:text-sky-400 font-semibold mb-1">
                   Protein (g) *
                 </label>
                 <input
@@ -339,7 +346,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
             {hasPieceWeight && (
               <div className="pt-1 animate-in fade-in duration-150">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="ingredient-piece-weight-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   {unit === 'ml' ? 'Volym per styck (ml) *' : 'Vikt per styck (g) *'}
                 </label>
                 <input

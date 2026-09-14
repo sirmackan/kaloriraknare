@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, Check, Flame, Dumbbell } from 'lucide-react';
 import type { Ingredient, LoggedUnit, MealType } from '../types';
-import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
+import { MEAL_DEFINITE_LABELS } from '../types';
 import { calculateNutrition } from '../utils/nutrition';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface AmountModalProps {
   ingredient: Ingredient;
@@ -41,6 +42,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
   const [amount, setAmount] = useState<string>(String(defaultAmt));
   const [localSubmitting, setLocalSubmitting] = useState(false);
   const isSubmitting = isSubmittingProp !== undefined ? isSubmittingProp : localSubmitting;
+  const dialogRef = useDialogAccessibility(onClose, isSubmitting);
 
   const sanitizedAmount = typeof amount === 'string' ? amount.replace(',', '.') : String(amount);
   const numericAmount = parseFloat(sanitizedAmount) || 0;
@@ -91,14 +93,14 @@ export const AmountModal: React.FC<AmountModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] flex flex-col my-auto animate-in fade-in duration-200 transition-colors">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="amount-modal-title" tabIndex={-1} className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] flex flex-col my-auto animate-in fade-in duration-200 transition-colors">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
               {isEditing ? 'Redigera rad' : `Lägg till i ${categoryLabel}`}
             </span>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
+            <h3 id="amount-modal-title" className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
               {ingredient.name}
             </h3>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-1">
@@ -116,6 +118,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
 
           <button
             id="close-amount-modal-btn"
+            aria-label="Stäng"
             onClick={onClose}
             className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
           >

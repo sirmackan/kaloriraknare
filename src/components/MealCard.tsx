@@ -37,6 +37,15 @@ export const MealCard: React.FC<MealCardProps> = ({
       {/* Meal Header */}
       <div
         onClick={() => onOpenAdd(mealType)}
+        onKeyDown={(event) => {
+          if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) {
+            event.preventDefault();
+            onOpenAdd(mealType);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={`Lägg till i ${mealTitle}`}
         className="p-3.5 bg-slate-50 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 transition-colors cursor-pointer hover:bg-slate-100/80 dark:hover:bg-slate-750 active:bg-slate-100 dark:active:bg-slate-700 select-none"
       >
         <div className="flex items-baseline gap-2 flex-1">

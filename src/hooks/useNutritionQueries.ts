@@ -1,346 +1,229 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useOptionalAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import type { MealType, LoggedUnit, BaseUnit, Ingredient } from '../types';
+import type { Ingredient } from '../types';
+import type { CopyMealInput, IngredientInput, LogRecipeInput, MealInput, MealUpdate, RecipeInput } from '../validation';
 
 export const nutritionKeys = {
-  allMeals: ['meals'] as const,
-  mealsByDate: (date: string) => ['meals', date] as const,
+  users: ['users'] as const,
+  meals: (userId: string) => ['users', userId, 'meals'] as const,
+  mealsByDate: (userId: string, date: string) => ['users', userId, 'meals', date] as const,
+  recipes: (userId: string) => ['users', userId, 'recipes'] as const,
+  recentIngredients: (userId: string) => ['users', userId, 'recent-ingredients'] as const,
   allIngredients: ['ingredients'] as const,
   ingredientById: (id: string) => ['ingredients', 'detail', id] as const,
-  ingredientsList: (q?: string, barcode?: string) => ['ingredients', 'list', { q: q || '', barcode: barcode || '' }] as const,
-  recentIngredients: ['ingredients', 'recent'] as const,
-  allRecipes: ['recipes'] as const,
+  ingredientsList: (q?: string, barcode?: string) => ['ingredients', 'list', { q: q ?? '', barcode: barcode ?? '' }] as const,
 };
 
-// --- Meal Queries ---
+function useUserId() {
+  return useOptionalAuth()?.user?.id ?? '';
+}
+
 export function useMealsQuery(date: string, enabled = true) {
+  const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.mealsByDate(date),
+    queryKey: nutritionKeys.mealsByDate(userId, date),
     queryFn: () => api.getMeals(date),
-    enabled: Boolean(date) && enabled,
+    enabled: Boolean(userId && date && enabled),
   });
 }
 
-// --- Ingredient Queries ---
 export function useIngredientsQuery(q?: string, barcode?: string) {
-  const isEnabled = Boolean(q?.trim() || barcode?.trim());
   return useQuery({
     queryKey: nutritionKeys.ingredientsList(q, barcode),
     queryFn: () => api.getIngredients(q, barcode),
-    enabled: isEnabled,
+    enabled: Boolean(q?.trim() || barcode?.trim()),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useRecentIngredientsQuery() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.recentIngredients,
-    queryFn: () => api.getRecentIngredients(),
+    queryKey: nutritionKeys.recentIngredients(userId),
+    queryFn: api.getRecentIngredients,
+    enabled: Boolean(userId),
   });
 }
 
-// --- Recipe Queries ---
 export function useRecipesQuery() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.allRecipes,
-    queryFn: () => api.getRecipes(),
+    queryKey: nutritionKeys.recipes(userId),
+    queryFn: api.getRecipes,
+    enabled: Boolean(userId),
   });
 }
 
-// --- Meal Mutations ---
 export function useLogMealMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: (item: {
-      date: string;
-      mealType: MealType;
-      ingredientId: string;
-      amount: number;
-      loggedUnit: LoggedUnit;
-    }) => api.logMeal(item),
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables.date) });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
-    },
-  });
-}
-
-export function useLogMealBatchMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (items: {
-      date: string;
-      mealType: MealType;
-      ingredientId: string;
-      amount: number;
-      loggedUnit: LoggedUnit;
-    }[]) => api.logMealBatch(items),
-    onSuccess: (data, variables) => {
-      if (variables.length > 0) {
-        queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables[0].date) });
-        queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
-      }
+    mutationFn: (item: MealInput) => api.logMeal(item),
+    onSuccess: (_data, item) => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(userId, item.date) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
 export function useUpdateMealMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: ({
-      id,
-      amount,
-      loggedUnit,
-    }: {
-      id: string;
-      amount: number;
-      loggedUnit: LoggedUnit;
-      date: string;
-    }) => api.updateMeal(id, amount, loggedUnit),
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables.date) });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+    mutationFn: ({ id, update }: { id: string; update: MealUpdate; date: string }) => api.updateMeal(id, update),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(userId, variables.date) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
 export function useDeleteMealMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
     mutationFn: ({ id }: { id: string; date: string }) => api.deleteMeal(id),
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables.date) });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(userId, variables.date) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
-
 
 export function useCopyMealFromDateMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: ({
-      targetDate,
-      targetMealType,
-      sourceDate,
-      sourceMealType,
-    }: {
-      targetDate: string;
-      targetMealType: MealType;
-      sourceDate: string;
-      sourceMealType: MealType;
-    }) => api.copyMealFromDate(targetDate, targetMealType, sourceDate, sourceMealType),
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(variables.targetDate) });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+    mutationFn: (input: CopyMealInput) => api.copyMealFromDate(input),
+    onSuccess: (_data, input) => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(userId, input.targetDate) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
-// --- Ingredient Mutations ---
 export function useCreateIngredientMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: (data: {
-      name: string;
-      barcode?: string;
-      unit: BaseUnit;
-      caloriesPer100: number;
-      proteinPer100: number;
-      pieceWeight?: number | null;
-    }) => api.createIngredient(data),
+    mutationFn: (data: IngredientInput) => api.createIngredient(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
 export function useUpdateIngredientMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: {
-        name: string;
-        barcode?: string;
-        unit: BaseUnit;
-        caloriesPer100: number;
-        proteinPer100: number;
-        pieceWeight?: number | null;
-      };
-    }) => api.updateIngredient(id, data),
+    mutationFn: ({ id, data }: { id: string; data: IngredientInput }) => api.updateIngredient(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allMeals });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.meals(userId) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
 export function useDeleteIngredientMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: (id: string) => api.deleteIngredient(id),
+    mutationFn: api.deleteIngredient,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allRecipes });
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recipes(userId) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
-// --- User Profile / Goals Mutations ---
 export function useUpdateGoalsMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ targetCalories, targetProtein }: { targetCalories: number; targetProtein: number }) =>
       api.updateGoals(targetCalories, targetProtein),
-    onSuccess: (updatedUser) => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allMeals });
-      return updatedUser;
-    },
   });
 }
 
 export function useCreateRecipeMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: ({
-      name,
-      items,
-    }: {
-      name: string;
-      items: { ingredientId: string; amount: number; loggedUnit: LoggedUnit }[];
-    }) => api.createRecipe(name, items),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allRecipes });
+    mutationFn: (input: RecipeInput) => api.createRecipe(input),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: nutritionKeys.recipes(userId) }),
+  });
+}
+
+export function useLogRecipeMutation() {
+  const queryClient = useQueryClient();
+  const userId = useUserId();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: LogRecipeInput }) => api.logRecipe(id, input),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.mealsByDate(userId, variables.input.date) });
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.recentIngredients(userId) });
     },
   });
 }
 
 export function useDeleteRecipeMutation() {
   const queryClient = useQueryClient();
+  const userId = useUserId();
   return useMutation({
-    mutationFn: (id: string) => api.deleteRecipe(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: nutritionKeys.allRecipes });
-    },
+    mutationFn: api.deleteRecipe,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: nutritionKeys.recipes(userId) }),
   });
 }
 
-/**
- * Cache-first lookup for a single ingredient.
- * Checks individual detail cache -> recent ingredients -> search list caches.
- * Falls back to network fetch and populates cache.
- */
-export async function getOrFetchIngredient(
-  queryClient: QueryClient,
-  id: string
-): Promise<Ingredient | null> {
+export async function getOrFetchIngredient(queryClient: QueryClient, userId: string, id: string): Promise<Ingredient | null> {
   if (!id) return null;
-
-  // 1. Direct detail cache
   const cached = queryClient.getQueryData<Ingredient>(nutritionKeys.ingredientById(id));
   if (cached) return cached;
 
-  // 2. Check recent ingredients
-  const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients);
-  const foundRecent = recent?.find((i) => i?.id === id);
+  const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients(userId));
+  const foundRecent = recent?.find((ingredient) => ingredient.id === id);
   if (foundRecent) {
     queryClient.setQueryData(nutritionKeys.ingredientById(id), foundRecent);
     return foundRecent;
   }
 
-  // 3. Check any ingredient list search cache
-  const allListQueries = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
-  for (const [, list] of allListQueries) {
-    if (Array.isArray(list)) {
-      const match = list.find((i) => i?.id === id);
-      if (match) {
-        queryClient.setQueryData(nutritionKeys.ingredientById(id), match);
-        return match;
-      }
+  for (const [, list] of queryClient.getQueriesData<Ingredient[]>({ queryKey: nutritionKeys.allIngredients })) {
+    const match = list?.find((ingredient) => ingredient.id === id);
+    if (match) {
+      queryClient.setQueryData(nutritionKeys.ingredientById(id), match);
+      return match;
     }
   }
 
-  // 4. Fetch from API and cache result
   const fetched = await api.getIngredientById(id);
-  if (fetched) {
-    queryClient.setQueryData(nutritionKeys.ingredientById(id), fetched);
-  }
+  if (fetched) queryClient.setQueryData(nutritionKeys.ingredientById(id), fetched);
   return fetched;
 }
 
-/**
- * Batch resolve ingredients with cache-first lookup.
- * Returns a Map of id -> Ingredient with at most 1 network request for all missing items.
- */
-export async function resolveIngredientsBatch(
-  queryClient: QueryClient,
-  ids: string[]
-): Promise<Map<string, Ingredient>> {
+export async function resolveIngredientsBatch(queryClient: QueryClient, userId: string, ids: string[]): Promise<Map<string, Ingredient>> {
   const result = new Map<string, Ingredient>();
-  if (!ids || ids.length === 0) return result;
-
-  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
-  const missingIds: string[] = [];
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients(userId)) ?? [];
+  const lists = queryClient.getQueriesData<Ingredient[]>({ queryKey: nutritionKeys.allIngredients });
 
   for (const id of uniqueIds) {
-    // 1. Direct detail cache
     const direct = queryClient.getQueryData<Ingredient>(nutritionKeys.ingredientById(id));
-    if (direct) {
-      result.set(id, direct);
-      continue;
-    }
-    missingIds.push(id);
+    const cached = direct ?? recent.find((ingredient) => ingredient.id === id)
+      ?? lists.flatMap(([, list]) => list ?? []).find((ingredient) => ingredient.id === id);
+    if (cached) result.set(id, cached);
   }
 
-  // 2. Check recent & list queries for missingIds
-  if (missingIds.length > 0) {
-    const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients) || [];
-    for (const ing of recent) {
-      if (ing?.id && missingIds.includes(ing.id)) {
-        result.set(ing.id, ing);
-        queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
-      }
-    }
-
-    const remainingMissing = missingIds.filter((id) => !result.has(id));
-    if (remainingMissing.length > 0) {
-      const allLists = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
-      for (const [, list] of allLists) {
-        if (Array.isArray(list)) {
-          for (const ing of list) {
-            if (ing?.id && remainingMissing.includes(ing.id)) {
-              result.set(ing.id, ing);
-              queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
-            }
-          }
-        }
-      }
-    }
+  const missing = uniqueIds.filter((id) => !result.has(id));
+  if (missing.length > 0) {
+    const fetched = await api.getIngredientsByIds(missing);
+    for (const ingredient of fetched) result.set(ingredient.id, ingredient);
   }
-
-  // 3. Execute at most ONE batch request for uncached items
-  const finalMissing = uniqueIds.filter((id) => !result.has(id));
-  if (finalMissing.length > 0) {
-    try {
-      const fetched = await api.getIngredientsByIds(finalMissing);
-      for (const ing of fetched) {
-        if (ing?.id) {
-          result.set(ing.id, ing);
-          queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to batch fetch missing ingredients:', err);
-    }
+  for (const ingredient of result.values()) {
+    queryClient.setQueryData(nutritionKeys.ingredientById(ingredient.id), ingredient);
   }
-
   return result;
 }

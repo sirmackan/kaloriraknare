@@ -9,20 +9,19 @@ export interface User {
   targetCalories: number;
   targetProtein: number;
   createdAt: string;
-  goalsConfigured?: boolean;
+  goalsConfigured: boolean;
 }
 
 export interface Ingredient {
   id: string;
   name: string;
-  barcode?: string;
+  barcode: string | null;
   unit: BaseUnit; // 'g' or 'ml'
   caloriesPer100: number; // kcal per 100g or 100ml
   proteinPer100: number; // g protein per 100g or 100ml
-  pieceWeight?: number | null; // Weight or volume in g/ml for 1 piece (e.g. 55g for 1 egg)
+  pieceWeight: number | null; // Weight or volume in g/ml for 1 piece (e.g. 55g for 1 egg)
   createdByUserId: string; // 'system' or user ID
-  createdByName?: string;
-  isDeleted?: boolean;
+  isDeleted: boolean;
   createdAt: string;
 }
 
@@ -31,12 +30,12 @@ export interface MealItem {
   userId: string;
   date: string; // YYYY-MM-DD
   mealType: MealType;
-  ingredientId?: string | null;
+  ingredientId: string | null;
   ingredientName: string;
   amount: number; // e.g. 150 (g) or 2 (st)
   loggedUnit: LoggedUnit;
   baseUnit: BaseUnit;
-  pieceWeight?: number | null;
+  pieceWeight: number | null;
   calories: number; // calculated kcal
   protein: number; // calculated protein (g)
   createdAt: string;
@@ -48,7 +47,7 @@ export interface RecipeItem {
   amount: number;
   loggedUnit: LoggedUnit;
   baseUnit: BaseUnit;
-  pieceWeight?: number | null;
+  pieceWeight: number | null;
   calories: number;
   protein: number;
 }
@@ -78,4 +77,3 @@ export const MEAL_DEFINITE_LABELS: Record<MealType, string> = {
   dinner: 'middagen',
   snack: 'mellanmålet',
 };
-

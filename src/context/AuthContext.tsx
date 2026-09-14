@@ -1,16 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User } from '../types';
 import { auth } from '../services/firebase';
-import { onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { api } from '../services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  error: string | null;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateGoals: (targetCalories: number, targetProtein: number) => Promise<void>;
-  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,21 +19,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      queryClient.removeQueries({ queryKey: ['users'] });
+      setError(null);
       if (fbUser) {
-        if (fbUser.isAnonymous) {
-          await fbSignOut(auth);
+        try {
+          const profile = await api.syncUser(fbUser);
+          setUser(profile);
+        } catch (syncError) {
+          console.error('Error loading user profile:', syncError);
+          setError(syncError instanceof Error ? syncError.message : 'Kunde inte läsa användarprofilen');
           setUser(null);
-        } else {
-          try {
-            const profile = await api.syncUser(fbUser);
-            setUser(profile);
-          } catch (err) {
-            console.error('Error loading user profile:', err);
-            setUser(null);
-          }
         }
       } else {
         setUser(null);
@@ -41,22 +42,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, []);
-
-  const refreshUser = async () => {
-    if (auth.currentUser && !auth.currentUser.isAnonymous) {
-      try {
-        const profile = await api.syncUser(auth.currentUser);
-        setUser(profile);
-      } catch (err) {
-        console.error('Error refreshing user profile:', err);
-      }
-    }
-  };
+  }, [queryClient]);
 
   const signInWithGoogle = async () => {
-    const profile = await api.signInWithGoogle();
-    setUser(profile);
+    setError(null);
+    try {
+      const profile = await api.signInWithGoogle();
+      setUser(profile);
+    } catch (signInError) {
+      const message = signInError instanceof Error ? signInError.message : 'Kunde inte logga in';
+      setError(message);
+      throw signInError;
+    }
   };
 
   const logout = async () => {
@@ -74,10 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
+        error,
         signInWithGoogle,
         logout,
         updateGoals,
-        refreshUser,
       }}
     >
       {children}
@@ -91,4 +88,8 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+export function useOptionalAuth() {
+  return useContext(AuthContext);
 }

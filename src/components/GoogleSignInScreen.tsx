@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { ThemeToggle } from './ThemeToggle';
 
 export const GoogleSignInScreen: React.FC = () => {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, error: authError } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -13,10 +13,14 @@ export const GoogleSignInScreen: React.FC = () => {
       setSigningIn(true);
       setErrorMessage(null);
       await signInWithGoogle();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google sign-in error:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Kunde inte logga in med Google. Försök igen.');
+      const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : undefined;
+      if (code !== 'auth/popup-closed-by-user') {
+        const fallback = code === 'auth/unauthorized-domain'
+          ? 'Den här domänen måste läggas till som tillåten domän i Firebase Authentication.'
+          : 'Kunde inte logga in med Google. Försök igen.';
+        setErrorMessage(err instanceof Error && !String(code).startsWith('auth/') ? err.message : fallback);
       }
     } finally {
       setSigningIn(false);
@@ -47,9 +51,9 @@ export const GoogleSignInScreen: React.FC = () => {
         </div>
 
         {/* Error message */}
-        {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs text-center">
-            {errorMessage}
+        {(errorMessage || authError) && (
+          <div role="alert" className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs text-center">
+            {errorMessage || authError}
           </div>
         )}
 

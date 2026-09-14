@@ -16,6 +16,7 @@ describe('database schema contracts', () => {
     assert.deepEqual(indexes(schema.ingredients), [
       { name: 'ingredients_name_trgm_idx', method: 'gin', columns: ['name'] },
       { name: 'ingredients_barcode_idx', method: 'btree', columns: ['barcode'] },
+      { name: 'ingredients_active_barcode_unique_idx', method: 'btree', columns: ['barcode'] },
     ]);
   });
 

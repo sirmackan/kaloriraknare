@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   onConfirm,
   onClose,
 }) => {
+  const dialogRef = useDialogAccessibility(onClose, isDeleting, isOpen);
   if (!isOpen) return null;
 
   return (
@@ -37,6 +39,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-delete-title"
+        tabIndex={-1}
         id="confirm-delete-modal-card"
         className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl text-slate-900 dark:text-slate-100 space-y-4 transition-colors"
       >
@@ -46,6 +53,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </div>
           <button
             id="close-confirm-delete-modal-btn"
+            aria-label="Stäng"
             type="button"
             disabled={isDeleting}
             onClick={onClose}
@@ -56,7 +64,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+          <h3 id="confirm-delete-title" className="text-lg font-bold text-slate-900 dark:text-white">
             {title}
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">

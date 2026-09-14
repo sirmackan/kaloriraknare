@@ -626,15 +626,15 @@ function AppContent() {
         {errorToast && (
           <div
             role="alert"
-            className="fixed top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 max-w-sm w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
+            className="fixed top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-start justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-200" />
-              <span className="truncate">{errorToast}</span>
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-200 mt-0.5" />
+              <span className="leading-snug break-words whitespace-normal">{errorToast}</span>
             </div>
             <button
               onClick={() => setErrorToast(null)}
-              className="p-1 text-rose-200 hover:text-white rounded-lg transition shrink-0"
+              className="p-1 -mr-1 -mt-0.5 text-rose-200 hover:text-white rounded-lg transition shrink-0 cursor-pointer"
               aria-label="Stäng felmeddelande"
             >
               <X className="w-4 h-4" />

@@ -32,10 +32,10 @@ export const createPool = () => {
       console.error('Unexpected error on idle SQL pool client:', err);
     });
 
-    // Configure pg_trgm word_similarity threshold for typo-tolerant matching
+    // Ensure pg_trgm extension and configure word_similarity threshold for typo-tolerant matching
     global._postgresPool.on('connect', (client) => {
-      void client.query('SET pg_trgm.word_similarity_threshold = 0.3;').catch((error) => {
-        console.error('Failed to configure pg_trgm similarity threshold:', error);
+      void client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm; SET pg_trgm.word_similarity_threshold = 0.3;').catch((error) => {
+        console.error('Failed to initialize pg_trgm extension or threshold:', error);
       });
     });
   }

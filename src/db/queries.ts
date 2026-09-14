@@ -58,7 +58,7 @@ export async function getIngredients(queryStr?: string, barcode?: string) {
   return db.select().from(ingredients)
     .where(and(
       eq(ingredients.isDeleted, false),
-      sql`(${ingredients.name} ILIKE ${containsTerm} ESCAPE '\\' OR ${clean} <% ${ingredients.name})`,
+      sql`(${ingredients.name} ILIKE ${containsTerm} ESCAPE '\\' OR word_similarity(${clean}, ${ingredients.name}) >= 0.3)`,
     ))
     .orderBy(relevanceTier, sql`word_similarity(${clean}, ${ingredients.name}) DESC`, asc(ingredients.name))
     .limit(30);

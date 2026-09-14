@@ -6,7 +6,6 @@ import { MEAL_LABELS } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { FoodItemRow } from './FoodItemRow';
 import { AmountModal } from './AmountModal';
-import { api } from '../services/api';
 import { calculateNutrition, calculateBatchTotals } from '../utils/nutrition';
 import {
   useRecipesQuery,
@@ -14,6 +13,7 @@ import {
   useCreateRecipeMutation,
   useDeleteRecipeMutation,
   nutritionKeys,
+  resolveIngredientsBatch,
 } from '../hooks/useNutritionQueries';
 
 interface RecipeModalProps {
@@ -71,69 +71,31 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       let isMounted = true;
 
       const resolveIngredients = async () => {
-        // 1. Check TanStack Query cache for authoritative ingredient records
-        const cachedMap = new Map<string, Ingredient>();
-
-        const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients);
-        if (recent) {
-          for (const ing of recent) {
-            if (ing?.id) cachedMap.set(ing.id, ing);
-          }
-        }
-
-        const allQueries = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
-        for (const [, queryData] of allQueries) {
-          if (Array.isArray(queryData)) {
-            for (const ing of queryData) {
-              if (ing?.id) cachedMap.set(ing.id, ing);
-            }
-          }
-        }
-
-        const buildMappedItems = () =>
-          initialMealToSave.items.map((item: any) => {
-            const authenticIng = cachedMap.get(item.ingredientId) || {
-              id: item.ingredientId,
-              name: item.ingredientName,
-              unit: item.baseUnit,
-              caloriesPer100: 0,
-              proteinPer100: 0,
-              pieceWeight: item.pieceWeight,
-              pieceLabel: item.pieceLabel,
-              createdByUserId: 'system',
-              createdAt: new Date().toISOString(),
-            };
-
-            return {
-              ingredient: authenticIng,
-              amount: item.amount,
-              unit: item.loggedUnit,
-            };
-          });
-
-        // Set initial items from cache if available
-        setRecipeItems(buildMappedItems());
-
-        // 2. Fetch any missing ingredients directly by ID from API (Zero Back-Calculation)
         const uniqueIds: string[] = Array.from(new Set<string>(initialMealToSave.items.map((i: any) => String(i.ingredientId))));
-        const missingIds: string[] = uniqueIds.filter((id: string) => !cachedMap.has(id));
+        const ingredientMap = await resolveIngredientsBatch(queryClient, uniqueIds);
 
-        if (missingIds.length > 0) {
-          try {
-            const fetched = await Promise.all(
-              missingIds.map((id: string) => api.getIngredientById(id).catch(() => null))
-            );
-            for (const ing of fetched) {
-              if (ing?.id) {
-                cachedMap.set(ing.id, ing);
-              }
-            }
-            if (isMounted) {
-              setRecipeItems(buildMappedItems());
-            }
-          } catch (err) {
-            console.error('Failed to fetch ingredients for recipe conversion:', err);
-          }
+        const mappedItems = initialMealToSave.items.map((item: any) => {
+          const authenticIng = ingredientMap.get(item.ingredientId) || {
+            id: item.ingredientId,
+            name: item.ingredientName,
+            unit: item.baseUnit,
+            caloriesPer100: 0,
+            proteinPer100: 0,
+            pieceWeight: item.pieceWeight,
+            pieceLabel: item.pieceLabel,
+            createdByUserId: 'system',
+            createdAt: new Date().toISOString(),
+          };
+
+          return {
+            ingredient: authenticIng,
+            amount: item.amount,
+            unit: item.loggedUnit,
+          };
+        });
+
+        if (isMounted) {
+          setRecipeItems(mappedItems);
         }
       };
 

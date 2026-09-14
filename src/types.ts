@@ -1,5 +1,5 @@
 export type BaseUnit = 'g' | 'ml';
-export type LoggedUnit = 'g' | 'ml' | 'st';
+export type LoggedUnit = 'g' | 'ml' | 'st' | 'port';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface User {
@@ -32,7 +32,7 @@ export interface MealItem {
   userId: string;
   date: string; // YYYY-MM-DD
   mealType: MealType;
-  ingredientId: string;
+  ingredientId?: string | null;
   ingredientName: string;
   amount: number; // e.g. 150 (g) or 2 (st)
   loggedUnit: LoggedUnit;

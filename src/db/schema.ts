@@ -42,7 +42,7 @@ export const meals = pgTable(
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     date: text('date').notNull(), // 'YYYY-MM-DD'
     mealType: text('meal_type').notNull(), // 'breakfast' | 'lunch' | 'dinner' | 'snack'
-    ingredientId: text('ingredient_id').notNull().references(() => ingredients.id),
+    ingredientId: text('ingredient_id').references(() => ingredients.id),
     ingredientName: text('ingredient_name').notNull(),
     amount: doublePrecision('amount').notNull(),
     loggedUnit: text('logged_unit').notNull().default('g'), // 'g' | 'ml' | 'st'

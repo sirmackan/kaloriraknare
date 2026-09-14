@@ -115,3 +115,11 @@ export function calculateBatchTotals(
 export function getDisplayPieceLabel(pieceLabel?: string | null): string {
   return pieceLabel && pieceLabel.trim().length > 0 ? pieceLabel.trim() : 'st';
 }
+
+/**
+ * Helper to display the formatted piece unit button label as "Antal (<unit>)".
+ * e.g. "Antal (skiva)", "Antal (ägg)", "Antal (st)".
+ */
+export function formatPieceUnitLabel(pieceLabel?: string | null): string {
+  return `Antal (${getDisplayPieceLabel(pieceLabel)})`;
+}

@@ -150,6 +150,24 @@ export const api = {
     return res.json();
   },
 
+  async getIngredientsByIds(ids: string[]): Promise<Ingredient[]> {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !ids || !Array.isArray(ids) || ids.length === 0) return [];
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return [];
+
+    const headers = await getHeaders();
+    const res = await fetch('/api/ingredients/batch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ids: uniqueIds }),
+    });
+    if (!res.ok) {
+      throw new Error('Kunde inte hämta råvaror i batch');
+    }
+    return res.json();
+  },
+
   async getRecentIngredients(): Promise<Ingredient[]> {
     const currentUser = auth.currentUser;
     if (!currentUser) return [];
@@ -227,9 +245,14 @@ export const api = {
   async logMeal(item: {
     date: string;
     mealType: MealType;
-    ingredientId: string;
-    amount: number;
-    loggedUnit: LoggedUnit;
+    ingredientId?: string | null;
+    amount?: number;
+    loggedUnit?: LoggedUnit | string;
+    calories?: number;
+    protein?: number;
+    ingredientName?: string;
+    name?: string;
+    baseUnit?: BaseUnit;
   }): Promise<MealItem> {
     const headers = await getHeaders();
     const res = await fetch('/api/meals', {
@@ -244,9 +267,15 @@ export const api = {
   async logMealBatch(items: {
     date: string;
     mealType: MealType;
-    ingredientId: string;
-    amount: number;
-    loggedUnit: LoggedUnit;
+    ingredientId?: string | null;
+    amount?: number;
+    loggedUnit?: LoggedUnit | string;
+    calories?: number;
+    protein?: number;
+    ingredientName?: string;
+    name?: string;
+    baseUnit?: BaseUnit;
+    pieceWeight?: number | null;
   }[]): Promise<MealItem[]> {
     const headers = await getHeaders();
     const res = await fetch('/api/meals/batch', {
@@ -258,12 +287,42 @@ export const api = {
     return res.json();
   },
 
-  async updateMeal(id: string, amount: number, loggedUnit: LoggedUnit): Promise<MealItem> {
+  async updateMeal(
+    id: string,
+    amountOrData?: number | {
+      amount?: number;
+      loggedUnit?: LoggedUnit | string;
+      calories?: number;
+      protein?: number;
+      ingredientName?: string;
+      name?: string;
+    },
+    loggedUnit?: LoggedUnit | string,
+    options?: {
+      calories?: number;
+      protein?: number;
+      ingredientName?: string;
+      name?: string;
+    }
+  ): Promise<MealItem> {
     const headers = await getHeaders();
+    let body: any;
+    if (typeof amountOrData === 'object' && amountOrData !== null) {
+      body = amountOrData;
+    } else {
+      body = {
+        amount: amountOrData,
+        loggedUnit,
+        calories: options?.calories,
+        protein: options?.protein,
+        ingredientName: options?.ingredientName || options?.name,
+        name: options?.name || options?.ingredientName,
+      };
+    }
     const res = await fetch(`/api/meals/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers,
-      body: JSON.stringify({ amount, loggedUnit }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error('Kunde inte uppdatera måltidsrad');
     return res.json();
@@ -295,9 +354,15 @@ export const api = {
     const batch = filtered.map((item) => ({
       date: targetDate,
       mealType: targetMealType,
-      ingredientId: item.ingredientId,
+      ingredientId: item.ingredientId || null,
       amount: item.amount,
       loggedUnit: item.loggedUnit,
+      baseUnit: item.baseUnit,
+      pieceWeight: item.pieceWeight,
+      calories: item.calories,
+      protein: item.protein,
+      ingredientName: item.ingredientName,
+      name: item.ingredientName,
     }));
 
     return this.logMealBatch(batch);

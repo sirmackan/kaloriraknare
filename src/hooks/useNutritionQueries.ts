@@ -1,11 +1,12 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
-import type { MealType, LoggedUnit, BaseUnit } from '../types';
+import type { MealType, LoggedUnit, BaseUnit, Ingredient } from '../types';
 
 export const nutritionKeys = {
   allMeals: ['meals'] as const,
   mealsByDate: (date: string) => ['meals', date] as const,
   allIngredients: ['ingredients'] as const,
+  ingredientById: (id: string) => ['ingredients', 'detail', id] as const,
   ingredientsList: (q?: string, barcode?: string) => ['ingredients', 'list', { q: q || '', barcode: barcode || '' }] as const,
   recentIngredients: ['ingredients', 'recent'] as const,
   allRecipes: ['recipes'] as const,
@@ -233,3 +234,116 @@ export function useDeleteRecipeMutation() {
     },
   });
 }
+
+/**
+ * Cache-first lookup for a single ingredient.
+ * Checks individual detail cache -> recent ingredients -> search list caches.
+ * Falls back to network fetch and populates cache.
+ */
+export async function getOrFetchIngredient(
+  queryClient: QueryClient,
+  id: string
+): Promise<Ingredient | null> {
+  if (!id) return null;
+
+  // 1. Direct detail cache
+  const cached = queryClient.getQueryData<Ingredient>(nutritionKeys.ingredientById(id));
+  if (cached) return cached;
+
+  // 2. Check recent ingredients
+  const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients);
+  const foundRecent = recent?.find((i) => i?.id === id);
+  if (foundRecent) {
+    queryClient.setQueryData(nutritionKeys.ingredientById(id), foundRecent);
+    return foundRecent;
+  }
+
+  // 3. Check any ingredient list search cache
+  const allListQueries = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
+  for (const [, list] of allListQueries) {
+    if (Array.isArray(list)) {
+      const match = list.find((i) => i?.id === id);
+      if (match) {
+        queryClient.setQueryData(nutritionKeys.ingredientById(id), match);
+        return match;
+      }
+    }
+  }
+
+  // 4. Fetch from API and cache result
+  const fetched = await api.getIngredientById(id);
+  if (fetched) {
+    queryClient.setQueryData(nutritionKeys.ingredientById(id), fetched);
+  }
+  return fetched;
+}
+
+/**
+ * Batch resolve ingredients with cache-first lookup.
+ * Returns a Map of id -> Ingredient with at most 1 network request for all missing items.
+ */
+export async function resolveIngredientsBatch(
+  queryClient: QueryClient,
+  ids: string[]
+): Promise<Map<string, Ingredient>> {
+  const result = new Map<string, Ingredient>();
+  if (!ids || ids.length === 0) return result;
+
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  const missingIds: string[] = [];
+
+  for (const id of uniqueIds) {
+    // 1. Direct detail cache
+    const direct = queryClient.getQueryData<Ingredient>(nutritionKeys.ingredientById(id));
+    if (direct) {
+      result.set(id, direct);
+      continue;
+    }
+    missingIds.push(id);
+  }
+
+  // 2. Check recent & list queries for missingIds
+  if (missingIds.length > 0) {
+    const recent = queryClient.getQueryData<Ingredient[]>(nutritionKeys.recentIngredients) || [];
+    for (const ing of recent) {
+      if (ing?.id && missingIds.includes(ing.id)) {
+        result.set(ing.id, ing);
+        queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
+      }
+    }
+
+    const remainingMissing = missingIds.filter((id) => !result.has(id));
+    if (remainingMissing.length > 0) {
+      const allLists = queryClient.getQueriesData<Ingredient[]>({ queryKey: ['ingredients'] });
+      for (const [, list] of allLists) {
+        if (Array.isArray(list)) {
+          for (const ing of list) {
+            if (ing?.id && remainingMissing.includes(ing.id)) {
+              result.set(ing.id, ing);
+              queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Execute at most ONE batch request for uncached items
+  const finalMissing = uniqueIds.filter((id) => !result.has(id));
+  if (finalMissing.length > 0) {
+    try {
+      const fetched = await api.getIngredientsByIds(finalMissing);
+      for (const ing of fetched) {
+        if (ing?.id) {
+          result.set(ing.id, ing);
+          queryClient.setQueryData(nutritionKeys.ingredientById(ing.id), ing);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to batch fetch missing ingredients:', err);
+    }
+  }
+
+  return result;
+}
+

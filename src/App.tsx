@@ -12,6 +12,7 @@ import { RecipeModal } from './components/RecipeModal';
 import { ProfileModal } from './components/ProfileModal';
 import { CopyYesterdayModal } from './components/CopyYesterdayModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { useQueryClient } from '@tanstack/react-query';
 import { GoogleSignInScreen } from './components/GoogleSignInScreen';
 import { getTodayString, addDays } from './utils/date';
 import { api } from './services/api';
@@ -25,6 +26,7 @@ import {
   useCreateIngredientMutation,
   useUpdateIngredientMutation,
   useDeleteIngredientMutation,
+  getOrFetchIngredient,
 } from './hooks/useNutritionQueries';
 import type { MealItem, MealType, Ingredient, Recipe, LoggedUnit } from './types';
 import { MEAL_TYPES, MEAL_DEFINITE_LABELS } from './types';
@@ -59,6 +61,7 @@ const slideVariants = {
 
 export type ActiveModal =
   | { type: 'log'; mealType: MealType }
+  | { type: 'quickLog'; mealType: MealType; editingItem?: MealItem }
   | {
       type: 'amount';
       ingredient: Ingredient;
@@ -85,6 +88,7 @@ export type ActiveModal =
   | null;
 
 function AppContent() {
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState<string>(getTodayString());
   const [direction, setDirection] = useState<number>(0);
@@ -198,8 +202,17 @@ function AppContent() {
 
   // Edit logged item
   const handleEditItem = async (item: MealItem) => {
+    if (!item.ingredientId) {
+      setActiveModal({
+        type: 'quickLog',
+        mealType: item.mealType,
+        editingItem: item,
+      });
+      return;
+    }
+
     try {
-      const fetchedIng = await api.getIngredientById(item.ingredientId);
+      const fetchedIng = await getOrFetchIngredient(queryClient, item.ingredientId);
       if (!fetchedIng) {
         showErrorToast('Råvaran kunde inte hittas');
         return;
@@ -284,6 +297,46 @@ function AppContent() {
       setActiveModal(null);
     } catch (err: any) {
       showErrorToast(err.message || 'Kunde inte spara mängd');
+    }
+  };
+
+  // Quick log item (direct calories and protein)
+  const handleQuickLog = async (data: {
+    calories: number;
+    protein: number;
+    name?: string;
+    editingItemId?: string;
+  }) => {
+    try {
+      if (data.editingItemId) {
+        await api.updateMeal(data.editingItemId, {
+          amount: 1,
+          loggedUnit: 'port',
+          calories: data.calories,
+          protein: data.protein,
+          ingredientName: data.name,
+          name: data.name,
+        });
+        queryClient.invalidateQueries({ queryKey: ['meals', currentDate] });
+        queryClient.invalidateQueries({ queryKey: ['ingredients', 'recent'] });
+      } else {
+        const mealType = (activeModal?.type === 'log' || activeModal?.type === 'quickLog')
+          ? activeModal.mealType
+          : 'lunch';
+        await api.logMeal({
+          date: currentDate,
+          mealType,
+          calories: data.calories,
+          protein: data.protein,
+          ingredientName: data.name,
+          name: data.name,
+        });
+        queryClient.invalidateQueries({ queryKey: ['meals', currentDate] });
+        queryClient.invalidateQueries({ queryKey: ['ingredients', 'recent'] });
+      }
+      setActiveModal(null);
+    } catch (err: any) {
+      showErrorToast(err.message || 'Kunde inte spara snabblogg');
     }
   };
 
@@ -430,10 +483,12 @@ function AppContent() {
           </AnimatePresence>
         </div>
 
-        {/* Log Modal (Search / Barcode scan / Recipes) */}
-        {activeModal?.type === 'log' && (
+        {/* Log Modal (Search / Barcode scan / Recipes / Quick Log) */}
+        {(activeModal?.type === 'log' || activeModal?.type === 'quickLog') && (
           <LogModal
             mealType={activeModal.mealType}
+            initialTab={activeModal.type === 'quickLog' ? 'quick' : 'search'}
+            editingQuickItem={activeModal.type === 'quickLog' ? activeModal.editingItem : undefined}
             onSelectIngredient={(ingredient) => {
               const meal = activeModal.mealType;
               setActiveModal({
@@ -463,6 +518,7 @@ function AppContent() {
               });
             }}
             onSelectRecipe={handleLogRecipe}
+            onQuickLog={handleQuickLog}
             onClose={() => setActiveModal(null)}
           />
         )}

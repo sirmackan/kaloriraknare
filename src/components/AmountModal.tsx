@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Check, Flame, Dumbbell } from 'lucide-react';
 import type { Ingredient, LoggedUnit, MealType } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
-import { calculateNutrition, getDisplayPieceLabel } from '../utils/nutrition';
+import { calculateNutrition, formatPieceUnitLabel } from '../utils/nutrition';
 
 interface AmountModalProps {
   ingredient: Ingredient;
@@ -137,7 +137,7 @@ export const AmountModal: React.FC<AmountModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Antal {getDisplayPieceLabel(ingredient.pieceLabel)}
+                {formatPieceUnitLabel(ingredient.pieceLabel)}
               </button>
               <button
                 type="button"

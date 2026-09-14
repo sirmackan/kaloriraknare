@@ -115,22 +115,27 @@ export const DailySummaryCard: React.FC<DailySummaryCardProps> = ({
             </span>
           </div>
 
-          <div className="flex items-baseline gap-1.5 mt-1">
-            <span
-              className={`text-2xl font-black tracking-tight ${
-                isProteinReached
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-slate-900 dark:text-white'
-              }`}
-            >
-              {isProteinReached
-                ? (remainingProtein < 0 ? `+${Math.abs(remainingProtein)}` : '0')
-                : remainingProtein}
-            </span>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {isProteinReached ? (remainingProtein < 0 ? 'g över mål' : 'g kvar') : 'g kvar'}
-            </span>
-          </div>
+          {isProteinReached ? (
+            remainingProtein < 0 ? (
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
+                  +{Math.abs(remainingProtein)}
+                </span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  g över mål
+                </span>
+              </div>
+            ) : null
+          ) : (
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                {remainingProtein}
+              </span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                g kvar
+              </span>
+            </div>
+          )}
 
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
             Ätit: <strong className="font-semibold text-slate-700 dark:text-slate-300">{totalProtein}</strong> g ({proConsumedPct}%)

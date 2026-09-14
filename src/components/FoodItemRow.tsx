@@ -16,6 +16,7 @@ export interface FoodItemRowProps {
   onEdit: () => void;
   onDelete: () => void;
   idPrefix?: string;
+  isQuick?: boolean;
 }
 
 export const FoodItemRow: React.FC<FoodItemRowProps> = ({
@@ -31,6 +32,7 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
   onEdit,
   onDelete,
   idPrefix = 'item',
+  isQuick = false,
 }) => {
   const isPiece = isPieceUnit(loggedUnit, baseUnit, pieceLabel);
   const hasPieceWeight = isPiece && Boolean(pieceWeight && pieceWeight > 0);
@@ -45,8 +47,13 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({
         className="flex-1 min-w-0 cursor-pointer"
         onClick={onEdit}
       >
-        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-          {name}
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+          <span>{name}</span>
+          {isQuick && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              Snabblogg
+            </span>
+          )}
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
           <span>

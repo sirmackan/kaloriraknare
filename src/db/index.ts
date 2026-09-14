@@ -24,6 +24,11 @@ export const createPool = () => {
     global._postgresPool.on('error', (err) => {
       console.error('Unexpected error on idle SQL pool client:', err);
     });
+
+    // Configure pg_trgm word_similarity threshold for typo-tolerant matching
+    global._postgresPool.on('connect', (client) => {
+      client.query('SET pg_trgm.word_similarity_threshold = 0.3;').catch(() => {});
+    });
   }
   return global._postgresPool;
 };

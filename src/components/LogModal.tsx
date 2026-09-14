@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil } from 'lucide-react';
-import type { Ingredient, MealType, Recipe } from '../types';
+import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap } from 'lucide-react';
+import type { Ingredient, MealType, Recipe, MealItem } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { api } from '../services/api';
 import { BarcodeScanner } from './BarcodeScanner';
@@ -12,24 +12,47 @@ import {
 
 interface LogModalProps {
   mealType: MealType;
+  initialTab?: TabType;
+  editingQuickItem?: MealItem;
   onSelectIngredient: (ingredient: Ingredient) => void;
   onRequestCreateIngredient: (prefilledBarcode?: string) => void;
   onEditIngredient?: (ingredient: Ingredient) => void;
   onSelectRecipe: (recipe: Recipe, mealType: MealType) => void;
+  onQuickLog?: (data: {
+    calories: number;
+    protein: number;
+    name?: string;
+    editingItemId?: string;
+  }) => Promise<void> | void;
   onClose: () => void;
 }
 
-type TabType = 'search' | 'recipes';
+type TabType = 'search' | 'recipes' | 'quick';
 
 export const LogModal: React.FC<LogModalProps> = ({
   mealType,
+  initialTab,
+  editingQuickItem,
   onSelectIngredient,
   onRequestCreateIngredient,
   onEditIngredient,
   onSelectRecipe,
+  onQuickLog,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('search');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab || (editingQuickItem ? 'quick' : 'search'));
+  const [quickCalories, setQuickCalories] = useState(
+    editingQuickItem ? String(editingQuickItem.calories) : ''
+  );
+  const [quickProtein, setQuickProtein] = useState(
+    editingQuickItem ? String(editingQuickItem.protein) : ''
+  );
+  const [quickName, setQuickName] = useState(
+    editingQuickItem
+      ? (editingQuickItem.ingredientName === 'Snabblogg' ? '' : editingQuickItem.ingredientName)
+      : ''
+  );
+  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isScanningCamera, setIsScanningCamera] = useState(false);
@@ -66,6 +89,30 @@ export const LogModal: React.FC<LogModalProps> = ({
     }
   };
 
+  // Handle quick tracking submit
+  const handleQuickSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onQuickLog || isSubmittingQuick) return;
+
+    const calNum = parseFloat(quickCalories.replace(',', '.')) || 0;
+    const proNum = Math.round((parseFloat(quickProtein.replace(',', '.')) || 0) * 10) / 10;
+    const trimmedName = quickName.trim() || undefined;
+
+    try {
+      setIsSubmittingQuick(true);
+      await onQuickLog({
+        calories: calNum,
+        protein: proNum,
+        name: trimmedName,
+        editingItemId: editingQuickItem?.id,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingQuick(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 overflow-y-auto">
       <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl text-slate-900 dark:text-slate-100 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col my-auto animate-in fade-in duration-150 transition-colors">
@@ -88,9 +135,10 @@ export const LogModal: React.FC<LogModalProps> = ({
           </button>
         </div>
 
-        {/* 2 Main Flow Tabs */}
+        {/* 3 Main Flow Tabs */}
         <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl my-3 border border-slate-200 dark:border-slate-800 transition-colors">
           <button
+            type="button"
             id="tab-flow-search-btn"
             onClick={() => setActiveTab('search')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition ${
@@ -104,6 +152,7 @@ export const LogModal: React.FC<LogModalProps> = ({
           </button>
 
           <button
+            type="button"
             id="tab-flow-recipes-btn"
             onClick={() => setActiveTab('recipes')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition ${
@@ -114,6 +163,20 @@ export const LogModal: React.FC<LogModalProps> = ({
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>Recept</span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-flow-quick-btn"
+            onClick={() => setActiveTab('quick')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition ${
+              activeTab === 'quick'
+                ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Snabblogg</span>
           </button>
         </div>
 
@@ -388,6 +451,108 @@ export const LogModal: React.FC<LogModalProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Tab 3: Quick Log ("Snabblogg") */}
+        {activeTab === 'quick' && (
+          <form onSubmit={handleQuickSubmit} className="flex-1 flex flex-col justify-between min-h-0 space-y-4 pt-1">
+            <div className="space-y-3.5">
+              {/* Kalorier input */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                <label htmlFor="quick-calories-input" className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                  Kalorier (kcal)
+                </label>
+                <div className="flex items-baseline gap-2">
+                  <input
+                    id="quick-calories-input"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    placeholder="0"
+                    value={quickCalories}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(',', '.');
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setQuickCalories(val);
+                      }
+                    }}
+                    className="w-full bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono placeholder-slate-300 dark:placeholder-slate-700"
+                  />
+                  <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">kcal</span>
+                </div>
+              </div>
+
+              {/* Protein input */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                <label htmlFor="quick-protein-input" className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                  Protein (g)
+                </label>
+                <div className="flex items-baseline gap-2">
+                  <input
+                    id="quick-protein-input"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    placeholder="0"
+                    value={quickProtein}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(',', '.');
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setQuickProtein(val);
+                      }
+                    }}
+                    className="w-full bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono placeholder-slate-300 dark:placeholder-slate-700"
+                  />
+                  <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">g</span>
+                </div>
+              </div>
+
+              {/* Valfritt namn / etikett */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                <label htmlFor="quick-name-input" className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                  Valfritt namn / etikett
+                </label>
+                <input
+                  id="quick-name-input"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="t.ex. Matlåda, Lunch ute"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  className="w-full bg-transparent text-sm font-medium text-slate-900 dark:text-white focus:outline-none placeholder-slate-400 dark:placeholder-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Submit button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                id="submit-quick-log-btn"
+                disabled={isSubmittingQuick || (!quickCalories && !quickProtein)}
+                className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl transition active:scale-98 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 cursor-pointer touch-manipulation"
+              >
+                {isSubmittingQuick ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <span>Sparar...</span>
+                  </>
+                ) : (
+                  <span>Logga</span>
+                )}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>

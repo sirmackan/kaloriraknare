@@ -9,6 +9,7 @@ import {
   updateUserGoals,
   getIngredients,
   getIngredientById,
+  getIngredientsByIds,
   getRecentIngredients,
   createIngredient,
   updateIngredient,
@@ -31,7 +32,7 @@ if (!getApps().length) {
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Disable ETag header generation to prevent 304 caching of dynamic API responses
 app.set('etag', false);
@@ -109,9 +110,27 @@ app.get('/api/ingredients', async (req, res) => {
   try {
     const userId = await requireAuth(req, res);
     if (!userId) return;
+    const idsParam = req.query.ids as string | undefined;
+    if (idsParam) {
+      const ids = idsParam.split(',').map((id) => id.trim()).filter(Boolean);
+      const items = await getIngredientsByIds(ids);
+      return res.json(items);
+    }
     const q = req.query.q as string | undefined;
     const barcode = req.query.barcode as string | undefined;
     const items = await getIngredients(q, barcode);
+    res.json(items);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ingredients/batch', async (req, res) => {
+  try {
+    const userId = await requireAuth(req, res);
+    if (!userId) return;
+    const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const items = await getIngredientsByIds(ids);
     res.json(items);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -225,8 +244,14 @@ app.put('/api/meals/:id', async (req, res) => {
   try {
     const userId = await requireAuth(req, res);
     if (!userId) return;
-    const { amount, loggedUnit } = req.body;
-    const updated = await updateMealItem(userId, req.params.id, amount, loggedUnit);
+    const { amount, loggedUnit, calories, protein, ingredientName, name } = req.body;
+    const updated = await updateMealItem(userId, req.params.id, {
+      amount,
+      loggedUnit,
+      calories,
+      protein,
+      ingredientName: ingredientName || name,
+    });
     res.json(updated);
   } catch (err: any) {
     if (err.message === 'Meal item not found' || err.message === 'Ingredient not found') {
@@ -288,6 +313,11 @@ app.delete('/api/recipes/:id', async (req, res) => {
   }
 });
 
+// 404 handler for unmatched /api routes
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -308,4 +338,8 @@ async function startServer() {
   });
 }
 
-startServer();
+export { app, startServer };
+
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}

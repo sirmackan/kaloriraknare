@@ -50,6 +50,11 @@
   box-shadow: none !important;
 }
 
+/* Keep compact form controls legible and prevent focus zoom in mobile browsers. */
+:where(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not(.text-lg):not(.text-xl):not(.text-2xl):not(.text-3xl) {
+  font-size: 16px;
+}
+
 :where(button, [role="button"], a[href]) {
   -webkit-tap-highlight-color: transparent;
 }

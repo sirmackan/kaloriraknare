@@ -6,6 +6,7 @@ import * as schema from './schema.ts';
 // Add global connection pool caching to persist across hot-reloads
 declare global {
   var _postgresPool: Pool | undefined;
+  var _drizzleInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
 }
 
 function requiredEnvironmentVariable(name: 'SQL_HOST' | 'SQL_USER' | 'SQL_PASSWORD' | 'SQL_DB_NAME') {
@@ -42,7 +43,31 @@ export const createPool = () => {
 };
 
 // Create or retrieve the pool instance.
-export const pool = createPool();
+export const pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const realPool = createPool();
+    const val = (realPool as any)[prop];
+    return typeof val === 'function' ? val.bind(realPool) : val;
+  },
+});
+
+let customDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+export function setDb(override: any) {
+  customDb = override;
+}
 
 // Initialize Drizzle with the pool and schema.
-export const db = drizzle(pool, { schema });
+export const db: ReturnType<typeof drizzle<typeof schema>> = new Proxy({} as any, {
+  get(_target, prop) {
+    if (customDb) {
+      const val = (customDb as any)[prop];
+      return typeof val === 'function' ? val.bind(customDb) : val;
+    }
+    if (!global._drizzleInstance) {
+      global._drizzleInstance = drizzle(createPool(), { schema });
+    }
+    const val = (global._drizzleInstance as any)[prop];
+    return typeof val === 'function' ? val.bind(global._drizzleInstance) : val;
+  },
+});

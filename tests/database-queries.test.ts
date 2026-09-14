@@ -1,6 +1,7 @@
-import { beforeEach, describe, it, mock } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { swedishIngredients } from './helpers/test-fixtures.ts';
+import { setDb } from '../src/db/index.ts';
 
 type Row = any;
 const state = { selectQueues: [] as Row[][], inserted: [] as Array<Row | Row[]>, limits: [] as number[], selectCalls: 0 };
@@ -41,7 +42,7 @@ fakeDb = {
   transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(fakeDb),
 };
 
-await mock.module(new URL('../src/db/index.ts', import.meta.url).href, { exports: { db: fakeDb } } as never);
+setDb(fakeDb);
 
 const { addMealItem, createRecipe, getIngredients, getIngredientsByIds, getRecentIngredients, InvalidReferenceError } =
   await import('../src/db/queries.ts');

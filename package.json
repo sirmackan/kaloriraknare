@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate --config src/db/drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config src/db/drizzle.config.ts",
-    "test": "tsx --test --experimental-test-module-mocks --disable-warning=ExperimentalWarning tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",

@@ -1,20 +1,16 @@
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { swedishIngredients } from './helpers/test-fixtures.ts';
+import { auth } from '../src/services/firebase.ts';
+import { api } from '../src/services/api.ts';
 
 const fakeAuth: { currentUser: null | { getIdToken: () => Promise<string> } } = { currentUser: null };
 
-await mock.module(new URL('../src/services/firebase.ts', import.meta.url).href, {
-  exports: { auth: fakeAuth, googleProvider: {} },
-} as never);
-await mock.module('firebase/auth', {
-  exports: {
-    signInWithPopup: async () => { throw new Error('not used in these tests'); },
-    signOut: async () => {},
-  },
-} as never);
+Object.defineProperty(auth, 'currentUser', {
+  get: () => fakeAuth.currentUser as any,
+  configurable: true,
+});
 
-const { api } = await import('../src/services/api.ts');
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {

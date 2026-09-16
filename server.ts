@@ -220,9 +220,13 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(409).json({ error: error.message });
     return;
   }
-  if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
-    res.status(409).json({ error: 'En aktiv råvara med den streckkoden finns redan' });
-    return;
+  const isUniqueViolation = typeof error === 'object' && error !== null && ((error as any).code === '23505' || (error as any).cause?.code === '23505');
+  if (isUniqueViolation) {
+    const constraint = (error as any).constraint || (error as any).cause?.constraint;
+    if (constraint === 'ingredients_active_barcode_unique_idx') {
+      res.status(409).json({ error: 'En aktiv råvara med den streckkoden finns redan' });
+      return;
+    }
   }
   console.error(error);
   res.status(500).json({ error: 'Ett oväntat serverfel inträffade' });

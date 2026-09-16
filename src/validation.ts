@@ -3,7 +3,33 @@ import { z } from 'zod';
 export const baseUnitSchema = z.enum(['g', 'ml']);
 export const loggedUnitSchema = z.enum(['g', 'ml', 'st']);
 export const mealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
-export const ean13Schema = z.string().regex(/^\d{13}$/, 'Streckkoden måste vara exakt 13 siffror');
+
+export function isValidEan13(barcode: string): boolean {
+  if (!/^\d{13}$/.test(barcode)) {
+    return false;
+  }
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += Number(barcode[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return Number(barcode[12]) === checkDigit;
+}
+
+export function calculateEan13CheckDigit(first12: string): number {
+  if (!/^\d{12}$/.test(first12)) {
+    throw new Error('EAN-13 prefix must be 12 digits');
+  }
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += Number(first12[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
+export const ean13Schema = z.string()
+  .regex(/^\d{13}$/, 'Streckkoden måste vara exakt 13 siffror')
+  .refine(isValidEan13, 'Ogiltig kontrollsiffra för EAN-13-streckkod');
 
 const finiteNonNegative = (maximum: number) => z.number().finite().min(0).max(maximum);
 const finitePositive = (maximum: number) => z.number().finite().positive().max(maximum);

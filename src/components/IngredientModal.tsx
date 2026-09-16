@@ -4,6 +4,7 @@ import type { BaseUnit, Ingredient } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BarcodeScanner } from './BarcodeScanner';
 import { ModalShell } from './ModalShell';
+import { isValidEan13, calculateEan13CheckDigit } from '../validation';
 
 interface IngredientModalProps {
   initialBarcode?: string;
@@ -79,9 +80,17 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
       setError('Namn på råvaran krävs');
       return;
     }
-    if (barcode.trim() && !/^\d{13}$/.test(barcode.trim())) {
-      setError('Streckkoden måste vara exakt 13 siffror');
-      return;
+    const trimmedBarcode = barcode.trim();
+    if (trimmedBarcode) {
+      if (!/^\d{13}$/.test(trimmedBarcode)) {
+        setError('Streckkoden måste vara exakt 13 siffror');
+        return;
+      }
+      if (!isValidEan13(trimmedBarcode)) {
+        const expected = calculateEan13CheckDigit(trimmedBarcode.slice(0, 12));
+        setError(`Ogiltig kontrollsiffra för EAN-13-streckkoden (sista siffran ska vara ${expected}, inte ${trimmedBarcode[12]})`);
+        return;
+      }
     }
     const sanitizedCal = typeof caloriesPer100 === 'string' ? caloriesPer100.replace(',', '.') : String(caloriesPer100);
     const sanitizedPro = typeof proteinPer100 === 'string' ? proteinPer100.replace(',', '.') : String(proteinPer100);
@@ -236,6 +245,22 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
               onChange={(e) => setBarcode(e.target.value.replace(/\D/g, '').slice(0, 13))}
               className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
             />
+            {barcode.trim().length === 13 && (
+              isValidEan13(barcode.trim()) ? (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                  ✓ Giltig EAN-13-kod
+                </p>
+              ) : (
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1 font-medium">
+                  Ogiltig kontrollsiffra (bör sluta på {calculateEan13CheckDigit(barcode.trim().slice(0, 12))})
+                </p>
+              )
+            )}
+            {barcode.trim().length > 0 && barcode.trim().length < 13 && (
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                {barcode.trim().length}/13 siffror
+              </p>
+            )}
           </div>
 
           {/* Basenhet */}

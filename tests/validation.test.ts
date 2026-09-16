@@ -1,12 +1,33 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { dateSchema, ean13Schema, ingredientInputSchema, mealInputSchema, mealUpdateSchema } from '../src/validation.ts';
+import {
+  dateSchema,
+  ean13Schema,
+  isValidEan13,
+  calculateEan13CheckDigit,
+  ingredientInputSchema,
+  mealInputSchema,
+  mealUpdateSchema,
+} from '../src/validation.ts';
 
 describe('runtime API validation', () => {
-  it('accepts only 13-digit EAN values', () => {
+  it('accepts only 13-digit EAN values with a valid check digit', () => {
+    // Valid EAN-13 barcodes
     assert.equal(ean13Schema.safeParse('7310865004123').success, true);
+    assert.equal(ean13Schema.safeParse('7310865097019').success, true);
+    assert.equal(ean13Schema.safeParse('5411188130055').success, true);
+    assert.equal(isValidEan13('7310865004123'), true);
+    assert.equal(calculateEan13CheckDigit('731086500412'), 3);
+
+    // 13 digits but invalid check digit
+    assert.equal(ean13Schema.safeParse('7310865004124').success, false);
+    assert.equal(ean13Schema.safeParse('7310865097018').success, false);
+    assert.equal(isValidEan13('7310865004124'), false);
+
+    // Invalid length or non-numeric characters
     for (const value of ['731086500412', '73108650041234', '731086500412X', ' 7310865004123 ']) {
       assert.equal(ean13Schema.safeParse(value).success, false);
+      assert.equal(isValidEan13(value), false);
     }
   });
 

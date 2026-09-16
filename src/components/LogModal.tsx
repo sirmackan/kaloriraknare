@@ -4,6 +4,7 @@ import type { Ingredient, MealType, Recipe, MealItem } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
 import { api } from '../services/api';
 import { BarcodeScanner } from './BarcodeScanner';
+import { isValidEan13 } from '../validation';
 import {
   useRecentIngredientsQuery,
   useIngredientsQuery,
@@ -71,7 +72,7 @@ export const LogModal: React.FC<LogModalProps> = ({
   }, [query]);
 
   // TanStack Queries
-  const isTypedEan13 = /^\d{13}$/.test(debouncedQuery);
+  const isTypedEan13 = isValidEan13(debouncedQuery);
   const { data: recentIngredients = [], isError: recentFailed } = useRecentIngredientsQuery();
   const { data: searchResults = [], isFetching: isSearching, isError: searchFailed } = useIngredientsQuery(
     isTypedEan13 ? undefined : debouncedQuery,
@@ -83,6 +84,10 @@ export const LogModal: React.FC<LogModalProps> = ({
   const handleBarcodeScanned = async (barcode: string) => {
     setIsScanningCamera(false);
     setLookupError(null);
+    if (!isValidEan13(barcode)) {
+      setLookupError('Ogiltig kontrollsiffra för den skannade streckkoden');
+      return;
+    }
     try {
       const matches = await api.getIngredients(undefined, barcode);
       if (matches.length > 0) {

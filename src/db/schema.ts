@@ -35,7 +35,26 @@ export const ingredients = pgTable(
     index('ingredients_name_trgm_idx').using('gin', table.name.op('gin_trgm_ops')),
     index('ingredients_barcode_idx').on(table.barcode),
     uniqueIndex('ingredients_active_barcode_unique_idx').on(table.barcode).where(sql`${table.isDeleted} = false AND ${table.barcode} IS NOT NULL`),
-    check('ingredients_barcode_ean13_check', sql`${table.barcode} IS NULL OR ${table.barcode} ~ '^[0-9]{13}$'`),
+    check('ingredients_barcode_ean13_check', sql`${table.barcode} IS NULL OR (
+      ${table.barcode} ~ '^[0-9]{13}$' AND (
+        (10 - (
+          (
+            SUBSTRING(${table.barcode}, 1, 1)::integer +
+            SUBSTRING(${table.barcode}, 2, 1)::integer * 3 +
+            SUBSTRING(${table.barcode}, 3, 1)::integer +
+            SUBSTRING(${table.barcode}, 4, 1)::integer * 3 +
+            SUBSTRING(${table.barcode}, 5, 1)::integer +
+            SUBSTRING(${table.barcode}, 6, 1)::integer * 3 +
+            SUBSTRING(${table.barcode}, 7, 1)::integer +
+            SUBSTRING(${table.barcode}, 8, 1)::integer * 3 +
+            SUBSTRING(${table.barcode}, 9, 1)::integer +
+            SUBSTRING(${table.barcode}, 10, 1)::integer * 3 +
+            SUBSTRING(${table.barcode}, 11, 1)::integer +
+            SUBSTRING(${table.barcode}, 12, 1)::integer * 3
+          ) % 10
+        )) % 10 = SUBSTRING(${table.barcode}, 13, 1)::integer
+      )
+    )`),
     check('ingredients_nutrition_non_negative_check', sql`${table.caloriesPer100} >= 0 AND ${table.proteinPer100} >= 0`),
     check('ingredients_piece_weight_positive_check', sql`${table.pieceWeight} IS NULL OR ${table.pieceWeight} > 0`),
     check('ingredients_unit_check', sql`${table.unit} IN ('g', 'ml')`),

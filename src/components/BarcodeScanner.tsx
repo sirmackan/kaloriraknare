@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, CameraOff, Zap, ZapOff } from 'lucide-react';
 import { BarcodeScanner as WasmBarcodeScanner, type ScanResult } from 'web-wasm-barcode-reader';
+import { isValidEan13 } from '../validation';
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
@@ -62,9 +63,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
           onDetect: (result: ScanResult) => {
             if (!isMounted || hasScannedRef.current) return;
             const cleaned = result?.data?.trim();
-            // Requirement: Only support scanning of exactly 13 digits (EAN-13).
+            // Requirement: Only support scanning of exactly 13 digits with valid EAN-13 check digit.
             // If anything else is detected, ignore and let camera keep scanning.
-            if (cleaned && /^\d{13}$/.test(cleaned)) {
+            if (cleaned && isValidEan13(cleaned)) {
               hasScannedRef.current = true;
               if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {

@@ -16,7 +16,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   prastost: {
     id: 'ing_prastost_02',
     name: 'Prästost 31%',
-    barcode: '7310865004124',
+    barcode: '7310865000026',
     unit: 'g',
     caloriesPer100: 380,
     proteinPer100: 26,
@@ -28,7 +28,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   ragbrod: {
     id: 'ing_ragbrod_03',
     name: 'Mörkt surdegsrågbröd',
-    barcode: '7310865004125',
+    barcode: '7310865000033',
     unit: 'g',
     caloriesPer100: 220,
     proteinPer100: 7.0,
@@ -40,7 +40,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   bregott: {
     id: 'ing_bregott_04',
     name: 'Bregott Extrasaltat',
-    barcode: '7310865004126',
+    barcode: '7310865000040',
     unit: 'g',
     caloriesPer100: 710,
     proteinPer100: 0.6,
@@ -52,7 +52,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   kyckling: {
     id: 'ing_kyckling_05',
     name: 'Kycklingbröstfilé rå',
-    barcode: '7310865004127',
+    barcode: '7310865000057',
     unit: 'g',
     caloriesPer100: 110,
     proteinPer100: 23.0,
@@ -64,7 +64,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   ris: {
     id: 'ing_ris_06',
     name: 'Jasminris okokt',
-    barcode: '7310865004128',
+    barcode: '7310865000064',
     unit: 'g',
     caloriesPer100: 355,
     proteinPer100: 7.2,
@@ -76,7 +76,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   mjolk: {
     id: 'ing_mjolk_07',
     name: 'Mellanmjölk 1.5%',
-    barcode: '7310865004129',
+    barcode: '7310865000071',
     unit: 'ml',
     caloriesPer100: 46,
     proteinPer100: 3.4,
@@ -88,7 +88,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   havregryn: {
     id: 'ing_havregryn_08',
     name: 'Gyllenhammars havregryn',
-    barcode: '7310865004130',
+    barcode: '7310865000088',
     unit: 'g',
     caloriesPer100: 370,
     proteinPer100: 13.0,
@@ -100,7 +100,7 @@ export const swedishIngredients: Record<string, Ingredient> = {
   protein_skopa: {
     id: 'ing_protein_09',
     name: 'Vassleproteinpulver Vanilj',
-    barcode: '7310865004131',
+    barcode: '7310865000095',
     unit: 'g',
     caloriesPer100: 390,
     proteinPer100: 75.0,

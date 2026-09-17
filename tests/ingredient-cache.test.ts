@@ -1,110 +1,159 @@
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
-import {
-  getOrFetchIngredient,
-  nutritionKeys,
-  resolveIngredientsBatch,
-} from '../src/hooks/useNutritionQueries.ts';
+import { getOrFetchIngredient, ingredientsQueryOptions, invalidateIngredientData, nutritionKeys, resolveIngredientsBatch } from '../src/hooks/useNutritionQueries.ts';
+import { queryClient as appQueryClient } from '../src/lib/queryClient.ts';
 import { api } from '../src/services/api.ts';
 import { swedishIngredients } from './helpers/test-fixtures.ts';
 
 const originalGetIngredientById = api.getIngredientById;
 const originalGetIngredientsByIds = api.getIngredientsByIds;
+const originalGetIngredients = api.getIngredients;
+const clients: QueryClient[] = [];
 
 afterEach(() => {
   api.getIngredientById = originalGetIngredientById;
   api.getIngredientsByIds = originalGetIngredientsByIds;
+  api.getIngredients = originalGetIngredients;
+  for (const queryClient of clients.splice(0)) queryClient.clear();
 });
 
 function client() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { ...appQueryClient.getDefaultOptions().queries, retry: false } },
+  });
+  clients.push(queryClient);
+  return queryClient;
 }
 
-describe('ingredient cache resolution', { concurrency: false }, () => {
-  it('returns null for an empty id without consulting the network', async () => {
+describe('ingredient query freshness', { concurrency: false }, () => {
+  it('inherits freshness from the client for searches, details, and batches', async () => {
+    const queryClient = client();
+    queryClient.setDefaultOptions({ queries: { staleTime: 600_000, retry: false } });
+    const ingredient = swedishIngredients.agg;
+    const updatedAt = Date.now() - 300_000;
+    queryClient.setQueryData(nutritionKeys.ingredientById(ingredient.id), ingredient, { updatedAt });
+    queryClient.setQueryData(nutritionKeys.ingredientsByIds([ingredient.id]), [ingredient], { updatedAt });
+    queryClient.setQueryData(nutritionKeys.ingredientsList('agg'), [ingredient], { updatedAt });
+    api.getIngredientById = async () => assert.fail('detail must respect the shared policy');
+    api.getIngredientsByIds = async () => assert.fail('batch must respect the shared policy');
+    api.getIngredients = async () => assert.fail('search must respect the shared policy');
+    assert.deepEqual(await getOrFetchIngredient(queryClient, ingredient.id), ingredient);
+    assert.equal((await resolveIngredientsBatch(queryClient, [ingredient.id])).size, 1);
+    assert.deepEqual(await queryClient.fetchQuery(ingredientsQueryOptions('agg')), [ingredient]);
+  });
+
+  it('shares fresh barcode results and refetches them after two minutes', async () => {
+    const queryClient = client();
+    const barcode = '7310865000026';
+    const options = ingredientsQueryOptions(undefined, barcode);
+    let calls = 0;
+    api.getIngredients = async (q, scannedBarcode) => {
+      assert.equal(q, undefined);
+      assert.equal(scannedBarcode, barcode);
+      calls++;
+      return [swedishIngredients.prastost];
+    };
+    await queryClient.fetchQuery(options);
+    await queryClient.fetchQuery(ingredientsQueryOptions(undefined, barcode));
+    assert.equal(calls, 1);
+    queryClient.setQueryData(options.queryKey, [swedishIngredients.prastost], { updatedAt: Date.now() - 121_000 });
+    await queryClient.fetchQuery(options);
+    assert.equal(calls, 2);
+  });
+
+  it('invalidates cached barcode misses when an ingredient is created', async () => {
+    const queryClient = client();
+    const options = ingredientsQueryOptions(undefined, '7310865000026');
+    api.getIngredients = async () => [];
+    assert.deepEqual(await queryClient.fetchQuery(options), []);
+    api.getIngredients = async () => [swedishIngredients.prastost];
+    invalidateIngredientData(queryClient, 'user-1');
+    assert.deepEqual(await queryClient.fetchQuery(options), [swedishIngredients.prastost]);
+  });
+
+  it('skips empty detail and batch requests', async () => {
+    api.getIngredientById = async () => assert.fail('network should not be called');
+    api.getIngredientsByIds = async () => assert.fail('network should not be called');
+    assert.equal(await getOrFetchIngredient(client(), ''), null);
+    assert.equal((await resolveIngredientsBatch(client(), ['', ''])).size, 0);
+  });
+
+  it('reuses a fresh detail result', async () => {
+    const queryClient = client();
+    queryClient.setQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id), swedishIngredients.agg);
+    api.getIngredientById = async () => assert.fail('network should not be called');
+    assert.deepEqual(await getOrFetchIngredient(queryClient, swedishIngredients.agg.id), swedishIngredients.agg);
+  });
+
+  it('can fetch a second ingredient with mixed detail and list caches', async () => {
+    const queryClient = client();
+    queryClient.setQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id), swedishIngredients.agg);
+    queryClient.setQueryData(nutritionKeys.ingredientsList('ris'), [swedishIngredients.ris]);
+    queryClient.setQueryData(nutritionKeys.recentIngredients('user-1'), [swedishIngredients.ris]);
+    const updated = { ...swedishIngredients.ris, caloriesPer100: 360 };
+    api.getIngredientById = async () => updated;
+    assert.deepEqual(await getOrFetchIngredient(queryClient, swedishIngredients.ris.id), updated);
+  });
+
+  it('refetches both expired and explicitly invalidated details', async () => {
+    const queryClient = client();
+    const key = nutritionKeys.ingredientById(swedishIngredients.agg.id);
+    queryClient.setQueryData(key, swedishIngredients.agg, { updatedAt: Date.now() - 300_000 });
+    let calls = 0;
+    api.getIngredientById = async () => ({ ...swedishIngredients.agg, caloriesPer100: ++calls });
+    assert.equal((await getOrFetchIngredient(queryClient, swedishIngredients.agg.id))?.caloriesPer100, 1);
+    await queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+    assert.equal((await getOrFetchIngredient(queryClient, swedishIngredients.agg.id))?.caloriesPer100, 2);
+    assert.equal(calls, 2);
+  });
+
+  it('deduplicates concurrent detail requests', async () => {
+    const queryClient = client();
     let calls = 0;
     api.getIngredientById = async () => {
       calls++;
       return swedishIngredients.agg;
     };
-    assert.equal(await getOrFetchIngredient(client(), 'user-1', ''), null);
-    assert.equal(calls, 0);
-  });
-
-  it('prefers the detail cache over every other source', async () => {
-    const queryClient = client();
-    queryClient.setQueryData(nutritionKeys.ingredientById('same-id'), { ...swedishIngredients.agg, id: 'same-id' });
-    queryClient.setQueryData(nutritionKeys.recentIngredients('user-1'), [{ ...swedishIngredients.ris, id: 'same-id' }]);
-    api.getIngredientById = async () => assert.fail('network should not be called');
-
-    assert.equal((await getOrFetchIngredient(queryClient, 'user-1', 'same-id'))?.name, swedishIngredients.agg.name);
-  });
-
-  it('promotes matches from recent and search-list caches into the detail cache', async () => {
-    const queryClient = client();
-    queryClient.setQueryData(nutritionKeys.recentIngredients('user-1'), [swedishIngredients.ris]);
-    queryClient.setQueryData(nutritionKeys.ingredientsList('kyck'), [swedishIngredients.kyckling]);
-    api.getIngredientById = async () => assert.fail('network should not be called');
-
-    assert.equal((await getOrFetchIngredient(queryClient, 'user-1', swedishIngredients.ris.id))?.id, swedishIngredients.ris.id);
-    assert.equal((await getOrFetchIngredient(queryClient, 'user-1', swedishIngredients.kyckling.id))?.id, swedishIngredients.kyckling.id);
-    assert.deepEqual(queryClient.getQueryData(nutritionKeys.ingredientById(swedishIngredients.ris.id)), swedishIngredients.ris);
-    assert.deepEqual(queryClient.getQueryData(nutritionKeys.ingredientById(swedishIngredients.kyckling.id)), swedishIngredients.kyckling);
-  });
-
-  it('fetches a cache miss once and stores the response in the detail cache', async () => {
-    const queryClient = client();
-    let calls = 0;
-    api.getIngredientById = async (id) => {
-      calls++;
-      assert.equal(id, swedishIngredients.agg.id);
-      return swedishIngredients.agg;
-    };
-
-    assert.deepEqual(await getOrFetchIngredient(queryClient, 'user-1', swedishIngredients.agg.id), swedishIngredients.agg);
+    const results = await Promise.all([
+      getOrFetchIngredient(queryClient, swedishIngredients.agg.id),
+      getOrFetchIngredient(queryClient, swedishIngredients.agg.id),
+    ]);
+    assert.deepEqual(results, [swedishIngredients.agg, swedishIngredients.agg]);
     assert.equal(calls, 1);
-    assert.deepEqual(queryClient.getQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id)), swedishIngredients.agg);
   });
 
-  it('deduplicates ids and makes one batch request containing only uncached ids', async () => {
+  it('deduplicates and sorts batch ids so reordering reuses the query', async () => {
     const queryClient = client();
-    queryClient.setQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id), swedishIngredients.agg);
-    queryClient.setQueryData(nutritionKeys.recentIngredients('user-1'), [swedishIngredients.ris]);
-    queryClient.setQueryData(nutritionKeys.ingredientsList('ost'), [swedishIngredients.prastost]);
+    const records = [swedishIngredients.agg, swedishIngredients.ris];
     const requests: string[][] = [];
     api.getIngredientsByIds = async (ids) => {
       requests.push(ids);
-      return [swedishIngredients.kyckling];
+      return records;
     };
-
-    const result = await resolveIngredientsBatch(queryClient, 'user-1', [
-      '',
-      swedishIngredients.agg.id,
-      swedishIngredients.ris.id,
-      swedishIngredients.prastost.id,
-      swedishIngredients.kyckling.id,
-      swedishIngredients.kyckling.id,
-    ]);
-
-    assert.deepEqual(requests, [[swedishIngredients.kyckling.id]]);
-    assert.deepEqual([...result.keys()].sort(), [
-      swedishIngredients.agg.id,
-      swedishIngredients.kyckling.id,
-      swedishIngredients.prastost.id,
-      swedishIngredients.ris.id,
-    ].sort());
-    assert.deepEqual(queryClient.getQueryData(nutritionKeys.ingredientById(swedishIngredients.kyckling.id)), swedishIngredients.kyckling);
+    const result = await resolveIngredientsBatch(queryClient, ['', records[1].id, records[0].id, records[1].id]);
+    await resolveIngredientsBatch(queryClient, [records[0].id, records[1].id]);
+    assert.deepEqual(requests, [records.map((record) => record.id).sort()]);
+    assert.deepEqual([...result.values()], records);
   });
 
-  it('returns cached results without a batch request when every unique id is present', async () => {
+  it('refetches invalidated batches without resurrecting deleted list entries', async () => {
+    const queryClient = client();
+    const record = swedishIngredients.agg;
+    queryClient.setQueryData(nutritionKeys.ingredientsList('agg'), [record]);
+    api.getIngredientsByIds = async () => [record];
+    assert.equal((await resolveIngredientsBatch(queryClient, [record.id])).size, 1);
+    await queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+    api.getIngredientsByIds = async () => [];
+    assert.equal((await resolveIngredientsBatch(queryClient, [record.id])).size, 0);
+  });
+
+  it('propagates a failed refresh instead of returning stale nutrition', async () => {
     const queryClient = client();
     queryClient.setQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id), swedishIngredients.agg);
-    api.getIngredientsByIds = async () => assert.fail('network should not be called');
-
-    const result = await resolveIngredientsBatch(queryClient, 'user-1', [swedishIngredients.agg.id, swedishIngredients.agg.id]);
-    assert.equal(result.size, 1);
-    assert.deepEqual(result.get(swedishIngredients.agg.id), swedishIngredients.agg);
+    await queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
+    api.getIngredientById = async () => { throw new Error('offline'); };
+    await assert.rejects(getOrFetchIngredient(queryClient, swedishIngredients.agg.id), /offline/);
   });
 
   it('never shares private meal or recent keys between accounts', () => {

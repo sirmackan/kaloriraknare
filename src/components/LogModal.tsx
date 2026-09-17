@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Clock, Plus, ChevronRight, ScanBarcode, Pencil, Zap } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { X, Search, BookOpen, Clock, Plus, ScanBarcode, Zap } from 'lucide-react';
 import type { Ingredient, MealType, Recipe, MealItem } from '../types';
 import { MEAL_LABELS, MEAL_DEFINITE_LABELS } from '../types';
-import { api } from '../services/api';
 import { BarcodeScanner } from './BarcodeScanner';
 import { isValidEan13 } from '../validation';
 import {
   useRecentIngredientsQuery,
   useIngredientsQuery,
   useRecipesQuery,
+  ingredientsQueryOptions,
 } from '../hooks/useNutritionQueries';
 import { LogSubmitButton } from './LogSubmitButton';
 import { ModalShell } from './ModalShell';
+import { IngredientPickerRow } from './IngredientPickerRow';
+import { DecimalInput } from './DecimalInput';
+import { parseDecimal } from '../utils/decimal';
 
 interface LogModalProps {
   mealType: MealType;
@@ -43,6 +47,7 @@ export const LogModal: React.FC<LogModalProps> = ({
   onQuickLog,
   onClose,
 }) => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>(initialTab || (editingQuickItem ? 'quick' : 'search'));
   const [quickCalories, setQuickCalories] = useState(
     editingQuickItem ? String(editingQuickItem.calories) : ''
@@ -62,6 +67,10 @@ export const LogModal: React.FC<LogModalProps> = ({
   const [loggingRecipeId, setLoggingRecipeId] = useState<string | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const preventClose = isSubmittingQuick || loggingRecipeId !== null;
+  const quickCaloriesValue = quickCalories === '' ? 0 : parseDecimal(quickCalories);
+  const quickProteinValue = quickProtein === '' ? 0 : parseDecimal(quickProtein);
+  const canSubmitQuick = quickCaloriesValue !== null && quickProteinValue !== null
+    && (quickCaloriesValue > 0 || quickProteinValue > 0);
 
   // Debounce search input by 280ms
   useEffect(() => {
@@ -89,7 +98,7 @@ export const LogModal: React.FC<LogModalProps> = ({
       return;
     }
     try {
-      const matches = await api.getIngredients(undefined, barcode);
+      const matches = await queryClient.fetchQuery(ingredientsQueryOptions(undefined, barcode));
       if (matches.length > 0) {
         // Barcode found! Open amount dialog directly
         onSelectIngredient(matches[0]);
@@ -106,17 +115,14 @@ export const LogModal: React.FC<LogModalProps> = ({
   // Handle quick tracking submit
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!onQuickLog || isSubmittingQuick) return;
-
-    const calNum = parseFloat(quickCalories.replace(',', '.')) || 0;
-    const proNum = Math.round((parseFloat(quickProtein.replace(',', '.')) || 0) * 10) / 10;
+    if (!onQuickLog || isSubmittingQuick || !canSubmitQuick) return;
     const trimmedName = quickName.trim() || undefined;
 
     try {
       setIsSubmittingQuick(true);
       await onQuickLog({
-        calories: calNum,
-        protein: proNum,
+        calories: quickCaloriesValue,
+        protein: quickProteinValue,
         name: trimmedName,
         editingItemId: editingQuickItem?.id,
       });
@@ -133,29 +139,12 @@ export const LogModal: React.FC<LogModalProps> = ({
       backdropClassName="z-50 p-3 overflow-y-auto"
       dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col animate-in fade-in duration-150"
       titleId="log-modal-title"
+      title={MEAL_LABELS[mealType]}
+      eyebrow="Logga måltid"
+      closeButtonId="close-log-modal-btn"
       preventClose={preventClose}
       onClose={onClose}
     >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-          <div>
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-              Logga måltid
-            </span>
-            <h3 id="log-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-              {MEAL_LABELS[mealType]}
-            </h3>
-          </div>
-          <button
-            id="close-log-modal-btn"
-            aria-label="Stäng"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* 3 Main Flow Tabs */}
         <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl my-3 border border-slate-200 dark:border-slate-800 transition-colors">
           <button
@@ -291,52 +280,14 @@ export const LogModal: React.FC<LogModalProps> = ({
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
                     {searchResults.map((ing) => (
-                      <div
+                      <IngredientPickerRow
                         key={ing.id}
                         id={`search-result-${ing.id}`}
-                        onClick={() => onSelectIngredient(ing)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            onSelectIngredient(ing);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition active:bg-slate-200 dark:active:bg-slate-700"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                            {ing.name}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            <span className="text-amber-600 dark:text-amber-300 font-medium">{ing.caloriesPer100} kcal</span>
-                            <span> • </span>
-                            <span className="text-sky-600 dark:text-sky-300 font-medium">{ing.proteinPer100} g protein</span>
-                            <span> / 100 {ing.unit}</span>
-                            {ing.pieceWeight && (
-                              <span className="text-slate-500 dark:text-slate-400"> ({ing.pieceWeight} {ing.unit}/st)</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          {onEditIngredient && (
-                            <button
-                              type="button"
-                              id={`edit-search-ing-${ing.id}-btn`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditIngredient(ing);
-                              }}
-                              title="Redigera eller ta bort råvara"
-                              className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition active:scale-95"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        </div>
-                      </div>
+                        ingredient={ing}
+                        onSelect={() => onSelectIngredient(ing)}
+                        onEdit={onEditIngredient ? () => onEditIngredient(ing) : undefined}
+                        editButtonId={`edit-search-ing-${ing.id}-btn`}
+                      />
                     ))}
                   </div>
                 )}
@@ -373,52 +324,14 @@ export const LogModal: React.FC<LogModalProps> = ({
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
                     {recentIngredients.map((ing) => (
-                      <div
+                      <IngredientPickerRow
                         key={ing.id}
                         id={`recent-ing-${ing.id}`}
-                        onClick={() => onSelectIngredient(ing)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            onSelectIngredient(ing);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition active:bg-slate-200 dark:active:bg-slate-700"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                            {ing.name}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            <span className="text-amber-600 dark:text-amber-300 font-medium">{ing.caloriesPer100} kcal</span>
-                            <span> • </span>
-                            <span className="text-sky-600 dark:text-sky-300 font-medium">{ing.proteinPer100} g protein</span>
-                            <span> / 100 {ing.unit}</span>
-                            {ing.pieceWeight && (
-                              <span className="text-slate-500 dark:text-slate-400"> ({ing.pieceWeight} {ing.unit}/st)</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          {onEditIngredient && (
-                            <button
-                              type="button"
-                              id={`edit-recent-ing-${ing.id}-btn`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditIngredient(ing);
-                              }}
-                              title="Redigera eller ta bort råvara"
-                              className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition active:scale-95"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        </div>
-                      </div>
+                        ingredient={ing}
+                        onSelect={() => onSelectIngredient(ing)}
+                        onEdit={onEditIngredient ? () => onEditIngredient(ing) : undefined}
+                        editButtonId={`edit-recent-ing-${ing.id}-btn`}
+                      />
                     ))}
                   </div>
                 )}
@@ -503,7 +416,7 @@ export const LogModal: React.FC<LogModalProps> = ({
 
         {/* Tab 3: Quick Log ("Snabblogg") */}
         {activeTab === 'quick' && (
-          <form onSubmit={handleQuickSubmit} className="flex-1 flex flex-col justify-between min-h-0 space-y-4 pt-1">
+          <form onSubmit={handleQuickSubmit} className="flex-1 flex flex-col justify-between min-h-0 overflow-y-auto space-y-4 pt-1">
             <div className="space-y-3.5">
               {/* Kalorier input */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
@@ -511,24 +424,11 @@ export const LogModal: React.FC<LogModalProps> = ({
                   Kalorier (kcal)
                 </label>
                 <div className="flex items-baseline gap-2">
-                  <input
+                  <DecimalInput
                     id="quick-calories-input"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-form-type="other"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
                     placeholder="0"
                     value={quickCalories}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setQuickCalories(val);
-                      }
-                    }}
+                    onValueChange={setQuickCalories}
                     className="w-full bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono placeholder-slate-300 dark:placeholder-slate-700"
                   />
                   <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">kcal</span>
@@ -541,24 +441,11 @@ export const LogModal: React.FC<LogModalProps> = ({
                   Protein (g)
                 </label>
                 <div className="flex items-baseline gap-2">
-                  <input
+                  <DecimalInput
                     id="quick-protein-input"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-form-type="other"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
                     placeholder="0"
                     value={quickProtein}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setQuickProtein(val);
-                      }
-                    }}
+                    onValueChange={setQuickProtein}
                     className="w-full bg-transparent text-2xl font-black text-slate-900 dark:text-white focus:outline-none tracking-tight font-mono placeholder-slate-300 dark:placeholder-slate-700"
                   />
                   <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">g</span>
@@ -587,7 +474,7 @@ export const LogModal: React.FC<LogModalProps> = ({
               <LogSubmitButton
                 id="submit-quick-log-btn"
                 destination={MEAL_DEFINITE_LABELS[mealType]}
-                disabled={isSubmittingQuick || (!quickCalories && !quickProtein)}
+                disabled={isSubmittingQuick || !canSubmitQuick}
                 isEditing={Boolean(editingQuickItem)}
                 isSubmitting={isSubmittingQuick}
               />

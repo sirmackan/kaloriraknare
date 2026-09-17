@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Target, User as UserIcon, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Check, Target, User as UserIcon, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { ModalShell } from './ModalShell';
@@ -69,26 +69,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose }) => {
       backdropClassName="z-50 p-3 overflow-y-auto"
       dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] overflow-y-auto"
       titleId="profile-modal-title"
+      title="Personliga mål & konto"
+      icon={<Target className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />}
+      closeButtonId="close-profile-modal-btn"
       preventClose={preventClose}
       onClose={onClose}
     >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
-            <h3 id="profile-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-              Personliga mål & konto
-            </h3>
-          </div>
-          <button
-            id="close-profile-modal-btn"
-            aria-label="Stäng"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition touch-manipulation"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* First login welcome notice */}
         {user?.goalsConfigured === false && (
           <div className="mt-3.5 p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">

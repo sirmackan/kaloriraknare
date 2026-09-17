@@ -220,7 +220,7 @@ function AppContent() {
     }
 
     try {
-      const fetchedIng = await getOrFetchIngredient(queryClient, user?.id ?? '', item.ingredientId);
+      const fetchedIng = await getOrFetchIngredient(queryClient, item.ingredientId);
       if (!fetchedIng) {
         showErrorToast('Råvaran kunde inte hittas');
         return;
@@ -249,7 +249,7 @@ function AppContent() {
   const handleConfirmDeleteMealItem = async () => {
     if (!mealItemToDelete) return;
     try {
-      await deleteMealMutation.mutateAsync({ id: mealItemToDelete.id, date: currentDate });
+      await deleteMealMutation.mutateAsync(mealItemToDelete.id);
       setMealItemToDelete(null);
     } catch (err: unknown) {
       showErrorToast(errorMessage(err, 'Kunde inte radera måltidsrad'));
@@ -286,7 +286,6 @@ function AppContent() {
         await updateMealMutation.mutateAsync({
           id: activeModal.existingItemId,
           update: { kind: 'ingredient', amount, loggedUnit: unit === 'port' ? activeModal.ingredient.unit : unit },
-          date: currentDate,
         });
       } else {
         await logMealMutation.mutateAsync({
@@ -315,7 +314,6 @@ function AppContent() {
       if (data.editingItemId) {
         await updateMealMutation.mutateAsync({
           id: data.editingItemId,
-          date: currentDate,
           update: {
           kind: 'quick',
           calories: data.calories,
@@ -412,16 +410,6 @@ function AppContent() {
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center text-slate-900 dark:text-slate-100 selection:bg-emerald-500 selection:text-slate-950 transition-colors">
       {/* Mobile container constraint: standard mobile device aspect ratio */}
       <div className="w-full max-w-md min-h-screen bg-slate-50 dark:bg-slate-900 border-x border-slate-200 dark:border-slate-800/80 flex flex-col relative shadow-xl dark:shadow-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-colors overflow-x-hidden">
-        {/* PWA Safe-area insets for all modal overlays */}
-        <style>{`
-          .fixed.inset-0.z-50,
-          .fixed.inset-0.z-70,
-          #confirm-delete-modal-overlay {
-            padding-top: max(0.75rem, env(safe-area-inset-top)) !important;
-            padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
-          }
-        `}</style>
-
         {/* Sticky Header with Date Navigator & Actions */}
         <DateHeader
           currentDate={currentDate}
@@ -626,7 +614,7 @@ function AppContent() {
         {errorToast && (
           <div
             role="alert"
-            className="fixed top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-start justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
+            className="fixed top-[max(1rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-80 max-w-md w-[calc(100%-2rem)] bg-rose-600 dark:bg-rose-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-start justify-between gap-3 text-sm font-semibold animate-in fade-in slide-in-from-top-4 duration-200"
           >
             <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <AlertCircle className="w-5 h-5 shrink-0 text-rose-200 mt-0.5" />

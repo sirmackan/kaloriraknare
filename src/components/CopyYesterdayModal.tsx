@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { History, X, ArrowRight, Loader2, AlertCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { History, ArrowRight, Loader2, AlertCircle, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import type { MealItem, MealType } from '../types';
 import { MEAL_LABELS } from '../types';
 import { addDays, formatHeaderDate } from '../utils/date';
@@ -27,8 +27,8 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
 
   const { data: items = [], isLoading: loading, isError: loadingFailed, refetch } = useMealsQuery(selectedDate, true);
 
-  const yesterdayDate = addDays(currentDate, -1);
-  const dayBeforeYesterday = addDays(currentDate, -2);
+  const previousDate = addDays(currentDate, -1);
+  const twoDaysBefore = addDays(currentDate, -2);
   const oneWeekAgo = addDays(currentDate, -7);
 
   // Group fetched items by mealType
@@ -63,7 +63,6 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
 
   const totalItems = ALL_MEALS.reduce((acc, mt) => acc + mealsByDate[mt].length, 0);
   const formattedSelected = formatHeaderDate(selectedDate);
-  const isSelectedYesterday = selectedDate === yesterdayDate;
 
   return (
     <ModalShell
@@ -72,34 +71,13 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
       dialogId="copy-yesterday-modal"
       dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col"
       titleId="copy-meal-title"
+      title="Kopiera måltid"
+      closeButtonId="close-copy-yesterday-btn"
+      icon={<History className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
+      subtitle={<>Till {formatHeaderDate(currentDate).label.toLowerCase()}, <span className="font-semibold text-emerald-600 dark:text-emerald-400">{MEAL_LABELS[targetMealType].toLowerCase()}</span></>}
       preventClose={copyingSource !== null}
       onClose={onClose}
     >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 dark:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <History className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 id="copy-meal-title" className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                Kopiera måltid
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Till {formatHeaderDate(currentDate).label.toLowerCase()}, <span className="font-semibold text-emerald-600 dark:text-emerald-400">{MEAL_LABELS[targetMealType].toLowerCase()}</span>
-              </p>
-            </div>
-          </div>
-          <button
-            id="close-copy-yesterday-btn"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
-            aria-label="Stäng"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
         {(copyError || loadingFailed) && (
           <div role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
             {copyError ?? 'Måltiderna kunde inte hämtas.'}
@@ -114,26 +92,26 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
             <button
               type="button"
               id="copy-date-yesterday-btn"
-              onClick={() => setSelectedDate(yesterdayDate)}
+              onClick={() => setSelectedDate(previousDate)}
               className={`flex-1 py-1.5 px-2 rounded-lg text-center font-medium transition active:scale-95 border ${
-                selectedDate === yesterdayDate
+                selectedDate === previousDate
                   ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold'
                   : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
-              Igår
+              Dagen före
             </button>
             <button
               type="button"
               id="copy-date-2days-btn"
-              onClick={() => setSelectedDate(dayBeforeYesterday)}
+              onClick={() => setSelectedDate(twoDaysBefore)}
               className={`flex-1 py-1.5 px-2 rounded-lg text-center font-medium transition active:scale-95 border ${
-                selectedDate === dayBeforeYesterday
+                selectedDate === twoDaysBefore
                   ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold'
                   : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
-              I förrgår
+              Två dagar före
             </button>
             <button
               type="button"
@@ -145,7 +123,7 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
                   : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
-              En vecka sedan
+              En vecka före
             </button>
           </div>
 
@@ -218,7 +196,7 @@ export const CopyYesterdayModal: React.FC<CopyYesterdayModalProps> = ({
           ) : (
             <>
               <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
-                Välj måltid att kopiera från {isSelectedYesterday ? 'igår' : formattedSelected.label.toLowerCase()}:
+                Välj måltid att kopiera från {formattedSelected.label.toLowerCase()}:
               </div>
 
               {ALL_MEALS.map((source) => {

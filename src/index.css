@@ -8,6 +8,11 @@
   --color-slate-855: #151d2e;
 }
 
+.modal-backdrop {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
 @layer base {
   html {
     color-scheme: light;

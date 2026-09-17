@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { X, Check, Barcode, Trash2, ScanBarcode } from 'lucide-react';
+import { Check, Barcode, Trash2, ScanBarcode } from 'lucide-react';
 import type { BaseUnit, Ingredient } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { BarcodeScanner } from './BarcodeScanner';
 import { ModalShell } from './ModalShell';
+import { DecimalInput } from './DecimalInput';
+import { parseDecimal } from '../utils/decimal';
 import { isValidEan13, calculateEan13CheckDigit } from '../validation';
 
 interface IngredientModalProps {
@@ -53,8 +55,8 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isScanningBarcode, setIsScanningBarcode] = useState(false);
 
-  const isSubmitting = isSubmittingProp !== undefined ? isSubmittingProp : localSubmitting;
-  const isDeleting = isDeletingProp !== undefined ? isDeletingProp : localDeleting;
+  const isSubmitting = Boolean(isSubmittingProp || localSubmitting);
+  const isDeleting = Boolean(isDeletingProp || localDeleting);
   const preventClose = isSubmitting || isDeleting;
 
   const handleConfirmDelete = async () => {
@@ -75,6 +77,7 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (preventClose) return;
     setError(null);
     if (!name.trim()) {
       setError('Namn på råvaran krävs');
@@ -92,23 +95,20 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
         return;
       }
     }
-    const sanitizedCal = typeof caloriesPer100 === 'string' ? caloriesPer100.replace(',', '.') : String(caloriesPer100);
-    const sanitizedPro = typeof proteinPer100 === 'string' ? proteinPer100.replace(',', '.') : String(proteinPer100);
-    const cal = parseFloat(sanitizedCal);
-    const pro = parseFloat(sanitizedPro);
-    if (isNaN(cal) || cal < 0) {
+    const cal = parseDecimal(caloriesPer100);
+    const pro = parseDecimal(proteinPer100);
+    if (cal === null) {
       setError(`Ange ett giltigt kaloriantal per 100 ${unit}`);
       return;
     }
-    if (isNaN(pro) || pro < 0) {
+    if (pro === null) {
       setError(`Ange ett giltigt proteinvärde per 100 ${unit}`);
       return;
     }
 
     let pwNum: number | null = null;
     if (hasPieceWeight) {
-      const sanitizedPw = typeof pieceWeight === 'string' ? pieceWeight.replace(',', '.') : String(pieceWeight);
-      if (!sanitizedPw.trim()) {
+      if (!pieceWeight) {
         setError(
           unit === 'ml'
             ? 'Ange volym per styck eller avmarkera fast volym per styck'
@@ -116,8 +116,8 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
         );
         return;
       }
-      pwNum = parseFloat(sanitizedPw);
-      if (isNaN(pwNum) || pwNum <= 0) {
+      pwNum = parseDecimal(pieceWeight);
+      if (pwNum === null || pwNum <= 0) {
         setError(
           unit === 'ml'
             ? 'Ange en giltig siffra för volym per styck'
@@ -148,28 +148,15 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
     <>
       <ModalShell
         backdropId="ingredient-modal-backdrop"
-        backdropClassName="z-50 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] overflow-y-auto"
+        backdropClassName="z-50 p-3 overflow-y-auto"
         dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-1.5rem))] overflow-y-auto"
         titleId="ingredient-modal-title"
+        title={editingIngredient ? 'Redigera råvara' : 'Ny råvara'}
+        closeButtonId="close-ingredient-modal-btn"
+        headerDivider={false}
         preventClose={preventClose}
         onClose={onClose}
       >
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 id="ingredient-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-              {editingIngredient ? 'Redigera råvara' : 'Ny råvara'}
-            </h3>
-          </div>
-          <button
-            id="close-ingredient-modal-btn"
-            aria-label="Stäng"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
         {error && (
           <div className="mb-3 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs font-medium text-rose-600 dark:text-rose-300">
             {error}
@@ -307,26 +294,13 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                 <label htmlFor="ingredient-cal-input" className="block text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">
                   Kalorier (kcal) *
                 </label>
-                <input
+                <DecimalInput
                   id="ingredient-cal-input"
                   name="item_calories"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  data-form-type="other"
-                  data-lpignore="true"
-                  data-1p-ignore="true"
                   required
                   placeholder="kcal"
                   value={caloriesPer100}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setCaloriesPer100(val);
-                    }
-                  }}
+                  onValueChange={setCaloriesPer100}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -335,26 +309,13 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                 <label htmlFor="ingredient-pro-input" className="block text-xs text-sky-600 dark:text-sky-400 font-semibold mb-1">
                   Protein (g) *
                 </label>
-                <input
+                <DecimalInput
                   id="ingredient-pro-input"
                   name="item_protein"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  data-form-type="other"
-                  data-lpignore="true"
-                  data-1p-ignore="true"
                   required
                   placeholder="gram"
                   value={proteinPer100}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setProteinPer100(val);
-                    }
-                  }}
+                  onValueChange={setProteinPer100}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-sky-400"
                 />
               </div>
@@ -381,25 +342,12 @@ export const IngredientModal: React.FC<IngredientModalProps> = ({
                 <label htmlFor="ingredient-piece-weight-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   {unit === 'ml' ? 'Volym per styck (ml) *' : 'Vikt per styck (g) *'}
                 </label>
-                <input
+                <DecimalInput
                   id="ingredient-piece-weight-input"
                   name="item_piece_weight"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  data-form-type="other"
-                  data-lpignore="true"
-                  data-1p-ignore="true"
                   placeholder="T.ex. 55"
                   value={pieceWeight}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setPieceWeight(val);
-                    }
-                  }}
+                  onValueChange={setPieceWeight}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-emerald-500"
                 />
               </div>

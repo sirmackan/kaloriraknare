@@ -8,6 +8,10 @@ import { DailySummaryCard } from '../src/components/DailySummaryCard.tsx';
 import { FoodItemRow } from '../src/components/FoodItemRow.tsx';
 import { LogModal } from '../src/components/LogModal.tsx';
 import { MealCard } from '../src/components/MealCard.tsx';
+import { ModalShell } from '../src/components/ModalShell.tsx';
+import { IngredientPickerRow } from '../src/components/IngredientPickerRow.tsx';
+import { DecimalInput } from '../src/components/DecimalInput.tsx';
+import { CopyYesterdayModal } from '../src/components/CopyYesterdayModal.tsx';
 import type { MealItem } from '../src/types.ts';
 import { swedishIngredients } from './helpers/test-fixtures.ts';
 
@@ -20,6 +24,72 @@ function section(html: string, id: string) {
 }
 
 describe('rendered component contracts', () => {
+  it('provides a shared labelled modal header and disables interaction while busy', () => {
+    const props = {
+      backdropId: 'test-backdrop',
+      dialogClassName: '',
+      titleId: 'test-title',
+      title: 'Test dialog',
+      closeButtonId: 'test-close',
+      onClose: noop,
+      children: 'Test content',
+    };
+    const html = renderToString(React.createElement(ModalShell, { ...props, preventClose: true }));
+    assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="test-title" aria-busy="true"/);
+    assert.equal((html.match(/id="test-title"/g) ?? []).length, 1);
+    assert.match(html, /id="test-close"[^>]*disabled=""/);
+    assert.match(html, /inert=""/);
+    assert.match(html, /Test content/);
+    const idle = renderToString(React.createElement(ModalShell, props));
+    assert.doesNotMatch(idle, /disabled=|inert=|aria-busy=/);
+    assert.equal(renderToString(React.createElement(ModalShell, { ...props, active: false })), '');
+  });
+
+  it('renders ingredient selection and editing as independent native buttons', () => {
+    const html = renderToString(React.createElement(IngredientPickerRow, {
+      id: 'picker-row',
+      ingredient: swedishIngredients.agg,
+      onSelect: noop,
+      onEdit: noop,
+      editButtonId: 'picker-edit',
+    }));
+    assert.equal((html.match(/<button\b/g) ?? []).length, 2);
+    assert.match(html, /<\/button><button id="picker-edit"/);
+    assert.match(html, /aria-label="Redigera /);
+    assert.match(html, /g protein/);
+    assert.doesNotMatch(html, /role="button"/);
+  });
+
+  it('preserves decimal text and requests the decimal keyboard', () => {
+    const html = renderToString(React.createElement(DecimalInput, {
+      id: 'test-decimal',
+      value: '12,50',
+      onValueChange: noop,
+    }));
+    assert.match(html, /type="text"/);
+    assert.match(html, /inputMode="decimal"/);
+    assert.match(html, /value="12,50"/);
+  });
+
+  it('labels copy presets relative to the selected day when browsing history', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
+    const html = renderToString(React.createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      React.createElement(CopyYesterdayModal, {
+        currentDate: '2001-03-02',
+        targetMealType: 'lunch',
+        onCopy: async () => {},
+        onClose: noop,
+      }),
+    ));
+    assert.match(html, />Dagen före</);
+    assert.match(html, />Två dagar före</);
+    assert.match(html, />En vecka före</);
+    assert.match(html, /value="2001-03-01"/);
+    assert.doesNotMatch(html, /Igår|I förrgår/);
+  });
+
   it('offers piece and base-unit entry for an ingredient with a piece weight', () => {
     const html = renderToString(React.createElement(AmountModal, {
       ingredient: swedishIngredients.prastost,

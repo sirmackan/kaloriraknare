@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, BookOpen, Utensils, Search, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, BookOpen, Utensils, Search, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Recipe, Ingredient, LoggedUnit, MealType, MealItem } from '../types';
 import { MEAL_LABELS } from '../types';
@@ -14,8 +14,8 @@ import {
   useDeleteRecipeMutation,
   resolveIngredientsBatch,
 } from '../hooks/useNutritionQueries';
-import { useAuth } from '../context/AuthContext';
 import { ModalShell } from './ModalShell';
+import { IngredientPickerRow } from './IngredientPickerRow';
 
 interface RecipeModalProps {
   initialMealToSave?: { mealType: MealType; items: MealItem[]; date?: string } | null;
@@ -27,7 +27,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   onClose,
 }) => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { data: recipes = [], isLoading: loading, isError: recipesFailed } = useRecipesQuery();
   const createRecipeMutation = useCreateRecipeMutation();
   const deleteRecipeMutation = useDeleteRecipeMutation();
@@ -41,8 +40,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
     amount: number;
     unit: LoggedUnit;
   }[]>([]);
-
-  const hasInitializedFromMeal = useRef(false);
 
   // Ingredient search within recipe builder with debounce
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,8 +62,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const preventClose = createRecipeMutation.isPending || deleteRecipeMutation.isPending;
 
   useEffect(() => {
-    if (initialMealToSave && initialMealToSave.items.length > 0 && !hasInitializedFromMeal.current) {
-      hasInitializedFromMeal.current = true;
+    if (initialMealToSave && initialMealToSave.items.length > 0) {
       setActiveTab('create');
       const mealDateStr = initialMealToSave.date || new Date().toISOString().split('T')[0];
       setRecipeName(`${MEAL_LABELS[initialMealToSave.mealType]} ${mealDateStr}`);
@@ -76,7 +72,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const resolveIngredients = async () => {
         try {
           const uniqueIds = [...new Set(initialMealToSave.items.flatMap((item) => item.ingredientId ? [item.ingredientId] : []))];
-          const ingredientMap = await resolveIngredientsBatch(queryClient, user?.id ?? '', uniqueIds);
+          const ingredientMap = await resolveIngredientsBatch(queryClient, uniqueIds);
           if (ingredientMap.size !== uniqueIds.length) throw new Error('En eller flera råvaror saknas eller har tagits bort');
           const mappedItems = initialMealToSave.items.map((item) => ({
             ingredient: ingredientMap.get(item.ingredientId!)!,
@@ -95,7 +91,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         isMounted = false;
       };
     }
-  }, [initialMealToSave, queryClient, user?.id]);
+  }, [initialMealToSave, queryClient]);
 
   const selectIngredientToAdd = (ing: Ingredient) => {
     setAddingIngredient(ing);
@@ -172,27 +168,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         backdropClassName="z-50 p-3 overflow-y-auto"
         dialogClassName="rounded-3xl p-5 max-h-[min(90dvh,calc(100dvh-1.5rem))] flex flex-col"
         titleId="recipe-modal-title"
+        title="Sparade recept"
+        icon={<BookOpen className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+        closeButtonId="close-recipe-modal-btn"
         preventClose={preventClose}
         onClose={onClose}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <h3 id="recipe-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-              Sparade recept
-            </h3>
-          </div>
-          <button
-            id="close-recipe-modal-btn"
-            aria-label="Stäng"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* Tab switcher */}
         <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl my-3 border border-slate-200 dark:border-slate-800 transition-colors">
           <button
@@ -364,28 +345,12 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                 {searchResults.length > 0 && (
                   <div className="mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden shadow-xl">
                     {searchResults.map((ing) => (
-                      <div
+                      <IngredientPickerRow
                         key={ing.id}
                         id={`search-ing-${ing.id}`}
-                        onClick={() => selectIngredientToAdd(ing)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            selectIngredientToAdd(ing);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        className="p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs transition"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-900 dark:text-slate-200">{ing.name}</div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                            {ing.caloriesPer100} kcal / {ing.proteinPer100} g protein
-                          </div>
-                        </div>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">+ Välj</span>
-                      </div>
+                        ingredient={ing}
+                        onSelect={() => selectIngredientToAdd(ing)}
+                      />
                     ))}
                   </div>
                 )}

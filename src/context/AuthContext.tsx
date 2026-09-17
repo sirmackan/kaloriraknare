@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      queryClient.removeQueries({ queryKey: ['users'] });
+      queryClient.clear();
       setError(null);
       if (fbUser) {
         try {

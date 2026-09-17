@@ -5,12 +5,10 @@ import type { Ingredient } from '../types';
 import type { CopyMealInput, IngredientInput, LogRecipeInput, MealInput, MealUpdate, RecipeInput } from '../validation';
 
 export const nutritionKeys = {
-  users: ['users'] as const,
-  user: (userId: string) => ['users', userId] as const,
-  meals: (userId: string) => ['users', userId, 'meals'] as const,
-  mealsByDate: (userId: string, date: string) => ['users', userId, 'meals', date] as const,
-  recipes: (userId: string) => ['users', userId, 'recipes'] as const,
-  recentIngredients: (userId: string) => ['users', userId, 'recent-ingredients'] as const,
+  privateData: ['private'] as const,
+  mealsByDate: (date: string) => ['private', 'meals', date] as const,
+  recipes: ['private', 'recipes'] as const,
+  recentIngredients: ['private', 'recent-ingredients'] as const,
   allIngredients: ['ingredients'] as const,
   ingredientById: (id: string) => ['ingredients', 'detail', id] as const,
   ingredientsByIds: (ids: string[]) => ['ingredients', 'batch', ids] as const,
@@ -21,19 +19,19 @@ function useUserId() {
   return useOptionalAuth()?.user?.id ?? '';
 }
 
-export function invalidateUserData(queryClient: QueryClient, userId: string) {
-  void queryClient.invalidateQueries({ queryKey: nutritionKeys.user(userId) });
+export function invalidateUserData(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: nutritionKeys.privateData });
 }
 
-export function invalidateIngredientData(queryClient: QueryClient, userId: string) {
+export function invalidateIngredientData(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: nutritionKeys.allIngredients });
-  invalidateUserData(queryClient, userId);
+  invalidateUserData(queryClient);
 }
 
 export function useMealsQuery(date: string, enabled = true) {
   const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.mealsByDate(userId, date),
+    queryKey: nutritionKeys.mealsByDate(date),
     queryFn: () => api.getMeals(date),
     enabled: Boolean(userId && date && enabled),
   });
@@ -57,7 +55,7 @@ export function useIngredientsQuery(q?: string, barcode?: string) {
 export function useRecentIngredientsQuery() {
   const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.recentIngredients(userId),
+    queryKey: nutritionKeys.recentIngredients,
     queryFn: api.getRecentIngredients,
     enabled: Boolean(userId),
   });
@@ -66,7 +64,7 @@ export function useRecentIngredientsQuery() {
 export function useRecipesQuery() {
   const userId = useUserId();
   return useQuery({
-    queryKey: nutritionKeys.recipes(userId),
+    queryKey: nutritionKeys.recipes,
     queryFn: api.getRecipes,
     enabled: Boolean(userId),
   });
@@ -74,64 +72,57 @@ export function useRecipesQuery() {
 
 export function useLogMealMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: (item: MealInput) => api.logMeal(item),
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useUpdateMealMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: ({ id, update }: { id: string; update: MealUpdate }) => api.updateMeal(id, update),
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useDeleteMealMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: api.deleteMeal,
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useCopyMealFromDateMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: (input: CopyMealInput) => api.copyMealFromDate(input),
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useCreateIngredientMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: (data: IngredientInput) => api.createIngredient(data),
-    onSuccess: () => invalidateIngredientData(queryClient, userId),
+    onSuccess: () => invalidateIngredientData(queryClient),
   });
 }
 
 export function useUpdateIngredientMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: IngredientInput }) => api.updateIngredient(id, data),
-    onSuccess: () => invalidateIngredientData(queryClient, userId),
+    onSuccess: () => invalidateIngredientData(queryClient),
   });
 }
 
 export function useDeleteIngredientMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: api.deleteIngredient,
-    onSuccess: () => invalidateIngredientData(queryClient, userId),
+    onSuccess: () => invalidateIngredientData(queryClient),
   });
 }
 
@@ -144,28 +135,25 @@ export function useUpdateGoalsMutation() {
 
 export function useCreateRecipeMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: (input: RecipeInput) => api.createRecipe(input),
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useLogRecipeMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: LogRecipeInput }) => api.logRecipe(id, input),
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 
 export function useDeleteRecipeMutation() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
   return useMutation({
     mutationFn: api.deleteRecipe,
-    onSuccess: () => invalidateUserData(queryClient, userId),
+    onSuccess: () => invalidateUserData(queryClient),
   });
 }
 

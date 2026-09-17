@@ -19,12 +19,12 @@ afterEach(() => {
   focusManager.setFocused(undefined);
 });
 
-function userKeys(userId: string) {
+function privateKeys() {
   return [
-    nutritionKeys.mealsByDate(userId, '2026-09-17'),
-    nutritionKeys.mealsByDate(userId, '2026-09-16'),
-    nutritionKeys.recipes(userId),
-    nutritionKeys.recentIngredients(userId),
+    nutritionKeys.mealsByDate('2026-09-17'),
+    nutritionKeys.mealsByDate('2026-09-16'),
+    nutritionKeys.recipes,
+    nutritionKeys.recentIngredients,
   ];
 }
 
@@ -43,12 +43,11 @@ describe('shared query policy', { concurrency: false }, () => {
     assert.equal(defaults?.refetchOnWindowFocus, true);
   });
 
-  it('invalidates all current-user queries but only refetches active queries', async () => {
+  it('invalidates all private queries but only refetches active queries', async () => {
     const queryClient = client();
-    const current = userKeys('user-1');
-    const other = userKeys('user-2');
+    const current = privateKeys();
     const calls: string[] = [];
-    for (const queryKey of [...current, ...other, ...ingredientKeys]) {
+    for (const queryKey of [...current, ...ingredientKeys]) {
       queryClient.setQueryDefaults(queryKey, {
         queryFn: async () => {
           calls.push(JSON.stringify(queryKey));
@@ -60,14 +59,14 @@ describe('shared query policy', { concurrency: false }, () => {
     const observer = new QueryObserver(queryClient, { queryKey: current[0] });
     const unsubscribe = observer.subscribe(() => {});
     try {
-      invalidateUserData(queryClient, 'user-1');
+      invalidateUserData(queryClient);
       await queryClient.getQueryCache().find({ queryKey: current[0] })?.promise;
       assert.deepEqual(calls, [JSON.stringify(current[0])]);
       assert.deepEqual(queryClient.getQueryData(current[0]), ['updated']);
       for (const queryKey of current.slice(1)) {
         assert.equal(queryClient.getQueryState(queryKey)?.isInvalidated, true);
       }
-      for (const queryKey of [...other, ...ingredientKeys]) {
+      for (const queryKey of ingredientKeys) {
         assert.equal(queryClient.getQueryState(queryKey)?.isInvalidated, false);
       }
     } finally {
@@ -75,26 +74,32 @@ describe('shared query policy', { concurrency: false }, () => {
     }
   });
 
-  it('invalidates ingredient queries and current-user queries without touching another user', () => {
+  it('invalidates ingredient queries and all private queries together', () => {
     const queryClient = client();
-    const current = userKeys('user-1');
-    const other = userKeys('user-2');
-    for (const queryKey of [...current, ...other, ...ingredientKeys]) {
+    const current = privateKeys();
+    for (const queryKey of [...current, ...ingredientKeys]) {
       queryClient.setQueryData(queryKey, []);
     }
-    invalidateIngredientData(queryClient, 'user-1');
+    invalidateIngredientData(queryClient);
     for (const queryKey of [...current, ...ingredientKeys]) {
       assert.equal(queryClient.getQueryState(queryKey)?.isInvalidated, true);
       assert.equal(queryClient.getQueryState(queryKey)?.fetchStatus, 'idle');
     }
-    for (const queryKey of other) {
-      assert.equal(queryClient.getQueryState(queryKey)?.isInvalidated, false);
+  });
+
+  it('can discard every cached result when authentication changes', () => {
+    const queryClient = client();
+    for (const queryKey of [...privateKeys(), ...ingredientKeys]) {
+      queryClient.setQueryData(queryKey, ['cached']);
     }
+    assert.equal(queryClient.getQueryCache().getAll().length, 8);
+    queryClient.clear();
+    assert.equal(queryClient.getQueryCache().getAll().length, 0);
   });
 
   it('refreshes stale active queries on return, but leaves fresh and inactive queries alone', { timeout: 2_000 }, async () => {
     const queryClient = client();
-    const [staleKey, inactiveKey, freshKey] = userKeys('user-1');
+    const [staleKey, inactiveKey, freshKey] = privateKeys();
     const oldTimestamp = Date.now() - 121_000;
     queryClient.setQueryData(staleKey, 'old', { updatedAt: oldTimestamp });
     queryClient.setQueryData(inactiveKey, 'old', { updatedAt: oldTimestamp });

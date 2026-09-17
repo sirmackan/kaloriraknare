@@ -68,7 +68,7 @@ describe('ingredient query freshness', { concurrency: false }, () => {
     api.getIngredients = async () => [];
     assert.deepEqual(await queryClient.fetchQuery(options), []);
     api.getIngredients = async () => [swedishIngredients.prastost];
-    invalidateIngredientData(queryClient, 'user-1');
+    invalidateIngredientData(queryClient);
     assert.deepEqual(await queryClient.fetchQuery(options), [swedishIngredients.prastost]);
   });
 
@@ -90,7 +90,7 @@ describe('ingredient query freshness', { concurrency: false }, () => {
     const queryClient = client();
     queryClient.setQueryData(nutritionKeys.ingredientById(swedishIngredients.agg.id), swedishIngredients.agg);
     queryClient.setQueryData(nutritionKeys.ingredientsList('ris'), [swedishIngredients.ris]);
-    queryClient.setQueryData(nutritionKeys.recentIngredients('user-1'), [swedishIngredients.ris]);
+    queryClient.setQueryData(nutritionKeys.recentIngredients, [swedishIngredients.ris]);
     const updated = { ...swedishIngredients.ris, caloriesPer100: 360 };
     api.getIngredientById = async () => updated;
     assert.deepEqual(await getOrFetchIngredient(queryClient, swedishIngredients.ris.id), updated);
@@ -156,9 +156,9 @@ describe('ingredient query freshness', { concurrency: false }, () => {
     await assert.rejects(getOrFetchIngredient(queryClient, swedishIngredients.agg.id), /offline/);
   });
 
-  it('never shares private meal or recent keys between accounts', () => {
-    assert.notDeepEqual(nutritionKeys.mealsByDate('user-a', '2026-09-14'), nutritionKeys.mealsByDate('user-b', '2026-09-14'));
-    assert.notDeepEqual(nutritionKeys.recentIngredients('user-a'), nutritionKeys.recentIngredients('user-b'));
-    assert.notDeepEqual(nutritionKeys.recipes('user-a'), nutritionKeys.recipes('user-b'));
+  it('uses stable private keys because account changes clear the client', () => {
+    assert.deepEqual(nutritionKeys.mealsByDate('2026-09-14'), ['private', 'meals', '2026-09-14']);
+    assert.deepEqual(nutritionKeys.recentIngredients, ['private', 'recent-ingredients']);
+    assert.deepEqual(nutritionKeys.recipes, ['private', 'recipes']);
   });
 });

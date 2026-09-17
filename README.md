@@ -28,7 +28,7 @@ The public `GET /api/health` route is a process liveness check. `GET /api/ready`
 - Barcodes are either absent or exactly 13 numeric EAN digits.
 - The scanner bundle is eagerly loaded so opening the scanner has no code-loading delay.
 - Ingredients are community-managed: every authenticated user can create, update, and soft-delete every active ingredient. `created_by_user_id` is audit metadata, not an authorization boundary.
-- Meals and recipes are private to a Firebase UID. Their client cache keys include that UID and private caches are removed when authentication changes.
+- Meals and recipes are private to a Firebase UID. The entire in-memory client cache is cleared whenever authentication changes, so private query results cannot carry across accounts.
 - Recipe items and copied meals use nutrition snapshots. Later edits to an ingredient do not retroactively change what a recipe displayed or what a copied meal logs.
 - Quick-log rows cannot be saved as recipe ingredients. This avoids recipes with unresolvable synthetic ingredients.
 
